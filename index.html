@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="vi" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/icon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#eceff2" />
+
+    <title>MES Production Dashboard</title>
+    <script>
+      (function () {
+        try {
+          var k = localStorage.getItem('sfcs-theme');
+          var t =
+            k === 'light' || k === 'dark'
+              ? k
+              : matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.classList.toggle('dark', t === 'dark');
+          document
+            .querySelector('meta[name=theme-color]')
+            ?.setAttribute('content', t === 'dark' ? '#0b0f14' : '#eceff2');
+        } catch (e) {
+          console.log(e);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
