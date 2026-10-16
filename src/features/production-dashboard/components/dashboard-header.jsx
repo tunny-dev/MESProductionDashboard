@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { format } from 'date-fns';
 import { enUS, vi, zhCN } from 'react-day-picker/locale';
-import { CalendarDays, Maximize2, Minimize2, RefreshCw, Search } from 'lucide-react';
+import { CalendarDays, Loader2, Maximize2, Minimize2, RefreshCw, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -42,6 +42,7 @@ function FilterSelect({
   valueTitle,
   placeholder,
   disabled = false,
+  loading = false,
   onValueChange,
   themeStyle,
   children,
@@ -61,14 +62,19 @@ function FilterSelect({
       >
         {label}
       </label>
-      <Select value={value ?? ''} onValueChange={onValueChange} disabled={disabled}>
+      <Select value={value ?? ''} onValueChange={onValueChange} disabled={disabled || loading}>
         <SelectTrigger
           id={id}
           aria-label={label}
           title={typeof valueTitle === 'string' ? valueTitle : undefined}
           className="w-full min-w-0 border-border-strong bg-[var(--surface)] px-2.5 text-base text-foreground hover:bg-[var(--surface-hover)] md:text-sm data-[size=default]:h-9"
         >
-          {displayText ? (
+          {loading ? (
+            <span className="flex flex-1 items-center gap-1.5 truncate text-left text-muted-foreground">
+              <Loader2 className="size-3.5 shrink-0 animate-spin text-production-blue" />
+              <span className="truncate">Đang tải...</span>
+            </span>
+          ) : displayText ? (
             <span className="flex-1 truncate text-left">{displayText}</span>
           ) : (
             <span className="flex-1 truncate text-left text-muted-foreground">{placeholder}</span>
@@ -106,6 +112,7 @@ export const DashboardHeader = memo(function DashboardHeader({
   clockTime,
   lastUpdated,
   isFetching,
+  isSearching = false,
   isDisconnected,
   isFullscreen,
   fullscreenUnsupported,
@@ -184,6 +191,7 @@ export const DashboardHeader = memo(function DashboardHeader({
           valueLabel={lineLabel || undefined}
           placeholder={copy.filters.selectLine}
           disabled={!process || linesLoading}
+          loading={linesLoading}
           themeStyle={themeStyle}
           onValueChange={onLineChange}
         >
@@ -246,6 +254,7 @@ export const DashboardHeader = memo(function DashboardHeader({
           valueLabel={woLabel || undefined}
           placeholder={copy.filters.selectWo}
           disabled={!lineId || woLoading}
+          loading={woLoading}
           onOpen={() => setWoPickerOpen(true)}
         />
         {woPickerOpen ? (
@@ -291,13 +300,17 @@ export const DashboardHeader = memo(function DashboardHeader({
             type="button"
             variant="default"
             size="icon-lg"
-            disabled={!canSearch}
+            disabled={!canSearch || isSearching}
             onClick={onSearch}
             title={copy.filters.search}
             aria-label={copy.filters.search}
             className="shrink-0"
           >
-            <Search aria-hidden="true" className="size-4" />
+            {isSearching ? (
+              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+            ) : (
+              <Search aria-hidden="true" className="size-4" />
+            )}
           </Button>
         </div>
       </section>

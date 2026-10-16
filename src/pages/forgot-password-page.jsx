@@ -1,11 +1,3 @@
-/**
- * QUÊN MẬT KHẨU — bản app nội bộ.
- *
- * App nội bộ nhà máy thì tài khoản do IT cấp và đặt lại, không có luồng "gửi
- * mã về email" tự phục vụ. Trang này nói rõ điều đó và đưa lối quay lại,
- * thay vì dựng một luồng OTP giả không đi tới đâu.
- */
-
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';

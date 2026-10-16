@@ -359,13 +359,6 @@
   }
 }
 
-/*
- * App kiosk/vận hành: KHÔNG trang nào được scroll ngang ở cấp trang —
- * bảng rộng tự scroll nội bộ (overflow-x-auto của nó). Chặn ở html/body
- * để không một khối nào (kể cả sticky offsets) lôi được thanh scroll
- * ngang của cả trang ra. Scroll dọc giữ nguyên. `clip` (không phải
- * `hidden`) để không sinh scroll-container mới làm vỡ `position: sticky`.
- */
 html,
 body {
   overflow-x: clip;

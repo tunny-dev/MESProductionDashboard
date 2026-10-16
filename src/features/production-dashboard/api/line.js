@@ -29,7 +29,10 @@ export async function getModels(lineId) {
     EDATE: sd,
   });
   return unwrapList(res)
-    .map((r) => ({ code: r.code ?? r.CODE ?? '', name: r.name ?? r.NAME ?? r.code ?? r.CODE ?? '' }))
+    .map((r) => ({
+      code: r.code ?? r.CODE ?? '',
+      name: r.name ?? r.NAME ?? r.code ?? r.CODE ?? '',
+    }))
     .filter((r) => r.code);
 }
 
@@ -88,10 +91,10 @@ export async function getMfgByLine(lineId) {
   if (!rows.length) return null;
   const r = rows[0];
   return {
-    stage: (r.stage ?? r.Stage) ?? lineId,
-    stageDes: (r.stageDes ?? r.StageDes) ?? '',
-    factory: (r.factory ?? r.Factory) ?? '',
-    mfgCode: (r.mfgCode ?? r.MfgCode) ?? '', // MfgCode — deptCode
-    mfgType: (r.mfgType ?? r.MfgType) ?? '', // SMT / DIP / FA
+    stage: r.stage ?? r.Stage ?? lineId,
+    stageDes: r.stageDes ?? r.StageDes ?? '',
+    factory: r.factory ?? r.Factory ?? '',
+    mfgCode: r.mfgCode ?? r.MfgCode ?? '', // MfgCode — deptCode
+    mfgType: r.mfgType ?? r.MfgType ?? '', // SMT / DIP / FA
   };
 }

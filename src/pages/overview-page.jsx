@@ -10,7 +10,11 @@ import { KpiRow } from '@/features/overview/components/kpi-row';
 import { FilterToolbar } from '@/features/overview/components/filter-toolbar';
 import { LineTable } from '@/features/overview/components/line-table';
 import { RefetchBar, DataFreshnessBanner } from '@/features/overview/components/data-freshness';
-import { useProductionSnapshot, useAreas } from '@/features/overview/hooks/use-production';
+import {
+  useProductionSnapshot,
+  useAreas,
+  useShifts,
+} from '@/features/overview/hooks/use-production';
 import { applyFilters, useFilters, useFilterActions } from '@/store/filter-store';
 import { truncateText } from '@/lib/format';
 import { MAX_CONSECUTIVE_FAILURES, useConsecutiveFailures } from '@/hooks/use-consecutive-failures';
@@ -24,10 +28,17 @@ export function OverviewPage() {
   const { applyFilters: applyFiltersPatch, resetFilters } = useFilterActions();
 
   const { data: areas = [] } = useAreas();
+  const { data: shifts = [] } = useShifts();
+  const [autoShiftId] = useState(null);
+  const autoShiftIdValue = autoShiftId ?? (shifts.length > 0 ? shifts[0].id : null);
+
+  const effectiveShiftId = shiftId ?? autoShiftIdValue;
+
   const { view, isLoading, isFetching, error, failureReason, refetch, dataUpdatedAt } =
     useProductionSnapshot({
-      shiftId,
+      shiftId: effectiveShiftId,
     });
+
   const { count: consecutiveFailures, reset: resetFailures } =
     useConsecutiveFailures(failureReason);
 
@@ -74,7 +85,7 @@ export function OverviewPage() {
           <KpiRow
             kpi={view.kpi}
             shift={view.shift}
-            shiftId={shiftId}
+            shiftId={effectiveShiftId}
             onShiftChange={setShiftId}
             updatedAt={dataUpdatedAt}
           />

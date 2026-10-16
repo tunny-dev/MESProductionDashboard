@@ -1,14 +1,3 @@
-/**
- * TRANG BIỂU ĐỒ NGÀY (doc mục 2, trang 3).
- *
- * Khác trang chi tiết: ở đây người ta xem MỘT NHÓM line cùng lúc, chọn ngày và
- * ca, và đọc số theo từng giờ. Đây là màn để ĐỌC SỐ, nên nó là nơi duy nhất
- * trong app được bật lưới ngang và nhãn mức (luật charts.md).
- *
- * Xem được hôm qua và ca đêm hôm trước: nhóm theo ca theo ShiftCalendar, không
- * nhóm theo ngày (doc mục 3).
- */
-
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RotateCw } from 'lucide-react';
@@ -71,9 +60,6 @@ export function ChartPage() {
   return (
     <div className="relative flex flex-col gap-4">
       <LoadingOverlay active={isLoading} label={t('freshness.loading')} />
-      {/* Ô chọn khoảng ngày: trang này là "biểu đồ NGÀY", nên ngày là tiêu chí
-          lọc chính và phải nằm cùng hàng với các bộ lọc khác — đặt trong
-          FilterToolbar, không tách thêm một hàng chỉ riêng cho nó. */}
       <p className="max-w-[70ch] text-sm text-pretty text-muted-foreground">
         {t('chart.description')}
       </p>
@@ -107,8 +93,6 @@ export function ChartPage() {
       ) : (
         <>
           <section className="rounded-lg border border-border bg-surface">
-            {/* Header xuống dòng ở màn hẹp: con số gộp làm tiêu đề bị đẩy sang
-                dòng riêng. Cho cả khối xuống dòng thay vì tách đôi. */}
             <header className="flex flex-col gap-0.5 border-b border-border px-4 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
               <h2 className="text-base font-semibold text-foreground">
                 {t('chart.cumulativeTitle')}
@@ -176,8 +160,6 @@ function HourlyGroupTable({ rows }) {
           </thead>
           <tbody className="divide-y divide-border">
             {visibleRows.map((row) => (
-              // Hàng này không bấm đi đâu: không tô nền khi rê, kẻo người dùng
-              // tưởng bấm được (luật I9). Bảng tổng quan có hover vì dòng là link.
               <tr key={row.hourMinutes} className="h-9">
                 <td className="px-3 py-1.5 table-nums">{row.label}</td>
                 <td className="px-3 py-1.5 text-right table-nums font-medium">

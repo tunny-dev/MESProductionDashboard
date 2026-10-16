@@ -5,15 +5,8 @@ import { useAuthStore } from '@/store/auth-store';
 import { triggerSessionExpiry } from '@/store/session-store';
 import { logger } from '@/lib/logger';
 
-/** Warn log khi request chậm hơn ngưỡng này. */
 const SLOW_THRESHOLD_MS = 3_000;
-
-/** Timeout mặc định; từng system có thể override qua system.timeout.
- * PHẢI nhỏ hơn chu kỳ polling (10s, xem DEFAULT_POLL_INTERVAL_MS): nếu timeout
- * dài hơn kỳ poll, kỳ sau sẽ hủy request đang bay trước khi nó kịp thất bại —
- * lỗi không bao giờ hiện hình, trang treo "Đang tải" mãi và bộ đếm 5 lần
- * hỏng liên tiếp (useConsecutiveFailures) không bao giờ chạy. */
-const DEFAULT_TIMEOUT_MS = 8_000;
+const DEFAULT_TIMEOUT_MS = 30000;
 
 const log = logger.child('mes');
 
@@ -64,8 +57,6 @@ function extractMesError(data) {
     return first.error ?? first.ERROR ?? first.message ?? first.MESSAGE ?? null;
   }
   if (data && typeof data === 'object') {
-    // `{ success: true, message: "Success", data: [...] }` KHÔNG phải lỗi —
-    // phải kiểm tra cờ success trước khi đọc message.
     if (data.success === true) return null;
     if (data.success === false) {
       return data.message ?? data.MESSAGE ?? data.error ?? data.ERROR ?? 'Request failed';
@@ -152,7 +143,6 @@ function createMesClient(system) {
         return Promise.reject(error);
       }
 
-      // Slow request warning
       if (duration !== null && duration > SLOW_THRESHOLD_MS) {
         log.warn('slow', { requestId, system: system.label, sCode, duration, rowCount });
       } else {
@@ -166,7 +156,6 @@ function createMesClient(system) {
         });
       }
 
-      // Phát hiện lỗi business trong payload
       const mesError = extractMesError(data);
       if (mesError) {
         log.warn('business-error', {
@@ -183,7 +172,6 @@ function createMesClient(system) {
         return Promise.reject(error);
       }
 
-      // Trả thẳng List<Map> cho tầng gọi
       return data;
     },
     (error) => {
@@ -209,7 +197,6 @@ function createMesClient(system) {
               : error.message),
       });
 
-      // Chuẩn hoá để tầng trên xử lý đồng nhất dù dùng system nào
       error.status = status;
       error.requestId = requestId;
       error.systemId = system.id;

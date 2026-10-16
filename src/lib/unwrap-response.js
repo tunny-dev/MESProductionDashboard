@@ -1,9 +1,3 @@
-/**
- * Bóc response linh hoạt — MES invoke trả mảng trần `[{...}, ...]`,
- * hệ thống khác bọc trong envelope `{ success, message, data: [...] }`.
- * Mọi chỗ cần danh sách đều đi qua đây để không phải `if` theo từng backend.
- */
-
 /** Key envelope phổ biến, theo thứ tự ưu tiên. */
 const ENVELOPE_KEYS = ['data', 'result', 'results', 'rows', 'items', 'list', 'records'];
 
@@ -37,8 +31,7 @@ export function unwrapEnvelope(payload) {
     const value = payload[key];
     if (Array.isArray(value)) return value;
   }
-  // `{ success, data: {...} }` — lõi là object thì trả lõi (đệ quy để bóc
-  // tiếp `{ data: { data: ... } }`). JSON hữu hạn nên luôn dừng.
+
   for (const key of ENVELOPE_KEYS) {
     const value = payload[key];
     if (value && typeof value === 'object' && !Array.isArray(value)) {

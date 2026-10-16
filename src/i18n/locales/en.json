@@ -162,6 +162,7 @@
     "routeFailedTitle": "Could not load this page",
     "routeFailedDescription": "Usually caused by a version change or a weak network. Reload the page.",
     "reloadPage": "Reload page",
+    "copyErrorCode": "Copy error code",
     "backToOverview": "Back to overview",
     "goBack": "Go back",
     "notFound": "404",

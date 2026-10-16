@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff } from 'lucide-react';
@@ -7,10 +7,15 @@ import { Input } from '@/components/ui/input.jsx';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field.jsx';
 import { LanguageSwitcher, ThemeSwitcher } from '@/components/common/preferences';
 import { LoadingButton } from '@/components/common';
+import { toast } from '@/components/ui/toast';
 import { useLogin } from '@/features/auth/hooks/use-auth';
+import { useSessionStore } from '@/store/session-store';
 
 export function LoginPage() {
   const { t } = useTranslation();
+
+  const sessionExpired = useSessionStore((s) => s.sessionExpired);
+  const resetSessionExpiry = useSessionStore((s) => s.resetSessionExpiry);
 
   const passwordRef = useRef(null);
   const [username, setUsername] = useState('');
@@ -18,6 +23,18 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const { mutate: doLogin, isPending, errorMessage, reset } = useLogin();
+
+  useEffect(() => {
+    if (sessionExpired) {
+      toast.add({
+        title: 'Phiên đăng nhập đã hết hạn',
+        description: 'Vui lòng đăng nhập lại để tiếp tục.',
+        type: 'warning',
+        timeout: 6000,
+      });
+      resetSessionExpiry();
+    }
+  }, [sessionExpired, resetSessionExpiry]);
 
   function handleSubmit(event) {
     event.preventDefault();

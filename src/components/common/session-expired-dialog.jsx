@@ -17,11 +17,18 @@ export function SessionExpiredDialog() {
   const resetSessionExpiry = useSessionStore((s) => s.resetSessionExpiry);
   const logout = useAuthStore((s) => s.logout);
 
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isAuthPage = pathname === '/login' || pathname === '/forgot-password';
+
   function handleLoginAgain() {
     logout();
     resetSessionExpiry();
     const back = window.location.pathname + window.location.search;
     window.location.assign(`/login?back=${encodeURIComponent(back)}`);
+  }
+
+  if (!sessionExpired || isAuthPage) {
+    return null;
   }
 
   return (

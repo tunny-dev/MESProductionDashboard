@@ -37,7 +37,7 @@ export function getMoSummaryPart({ mo, dateStr, dept, lineId, shift, scope }) {
     SHIFT: shift,
     SCOPE: scope,
   };
-  return postPart(MES_S_CODES.production.moSummary, params);
+  return postPart(MES_S_CODES.production.getMoSummary, params);
 }
 
 /**
@@ -54,7 +54,7 @@ export function getWipReportPart({ mo, dateStr, dept, lineId, shift, model, scop
     MODEL: model,
     SCOPE: scope,
   };
-  return postPart(MES_S_CODES.production.wipReport, params);
+  return postPart(MES_S_CODES.production.getWipReport, params);
 }
 
 /**
@@ -73,7 +73,7 @@ export function getChartOutputPart({ mo, dateStr, dept, lineId, shift, model, sc
     MODEL: model,
     SCOPE: scope,
   };
-  return postPart(MES_S_CODES.production.chartOutput, params);
+  return postPart(MES_S_CODES.production.getProductionAchievement, params);
 }
 
 /**
@@ -92,7 +92,7 @@ export function getChartUphPart({ mo, dateStr, dept, lineId, shift, model, scope
     MODEL: model,
     SCOPE: scope,
   };
-  return postPart(MES_S_CODES.production.chartUph, params);
+  return postPart(MES_S_CODES.production.getUphTrend, params);
 }
 
 /**
@@ -101,5 +101,5 @@ export function getChartUphPart({ mo, dateStr, dept, lineId, shift, model, scope
  */
 export function getFlowPart({ mo, dateStr, dept, lineId, shift }) {
   const params = { MO: mo, SDATE: dateStr, EDATE: dateStr, DEPT: dept, LINE: lineId, SHIFT: shift };
-  return postPart(MES_S_CODES.production.flowByMo, params);
+  return postPart(MES_S_CODES.production.getFlowByMo, params);
 }

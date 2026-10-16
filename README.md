@@ -103,10 +103,14 @@ import { mesGet, mesPost } from '@/lib/mes-http';
 import { MES_S_CODES } from '@/config/api';
 
 // System mặc định là sfcs
-const stages = await mesPost(MES_S_CODES.production.stages, { P_DC003: 'VN' });
+const stages = await mesPost(MES_S_CODES.production.getMfgType, { P_DC003: 'VN' });
 
 // Chỉ định system
-const lot = await mesGet(MES_S_CODES.wip.lotStatus, { P_LOT_ID: 'L001' }, 'wip');
+const wipSummary = await mesPost(
+  MES_S_CODES.wipReport.getWipSummary,
+  { P_MFG_TYPE: 'SMT' },
+  'sfcs'
+);
 ```
 
 Thêm system mới — chỉ sửa `src/config/api.js`, không sửa `mes-http.js`:

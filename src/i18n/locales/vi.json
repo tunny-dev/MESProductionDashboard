@@ -162,6 +162,7 @@
     "routeFailedTitle": "Không tải được trang này",
     "routeFailedDescription": "Thường do đổi phiên bản hoặc mạng yếu. Thử tải lại trang.",
     "reloadPage": "Tải lại trang",
+    "copyErrorCode": "Sao chép mã lỗi",
     "backToOverview": "Về trang tổng quan",
     "goBack": "Quay lại trang trước",
     "notFound": "404",

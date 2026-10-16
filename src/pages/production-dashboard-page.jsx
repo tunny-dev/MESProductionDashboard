@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
-import { LoadingOverlay } from '@/components/ui/loading-overlay';
+import { LoadingOverlay, Spinner } from '@/components/ui/loading-overlay';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -22,8 +22,6 @@ import {
   getSlotState,
   getStationStatus,
 } from '@/features/production-dashboard/lib/calc';
-// UPH mục tiêu: tạm fix cứng trong FE cho tới khi ERP / bảng tạm có số thật.
-// Xem giải thích trong file để biết lúc nào xoá.
 import { getTargetUph } from '@/features/production-dashboard/lib/dashboard-target-uph';
 import {
   DASHBOARD_CONFIG,
@@ -68,16 +66,11 @@ export function ProductionDashboardPage() {
 
   const urlLineId = searchParams.get('line');
   const debugMode = searchParams.get('debug') === '1';
-  // Công đoạn đang chọn: người dùng chọn tay thì lấy, không thì suy từ
-  // GET_MFG_BY_LINE khi mở bằng ?line=. Tính ra (derived) thay vì setState
-  // trong effect — setState trong effect tạo vòng render thừa.
   const [processChoice, setProcessChoice] = useState(null);
   const lineId = urlLineId || null;
 
   const [woValue, setWoValue] = useState(null);
   const [shiftId, setShiftId] = useState('day');
-  // Chế độ xem: 'DAY' = số của ca đang chọn; 'WO' = gom toàn bộ WO (6 nhóm
-  // ngày). MF008 là kế hoạch CẢ WO nên chỉ 'WO' mới so được với kế hoạch.
   const [scopeId, setScopeId] = useState('DAY');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -103,20 +96,15 @@ export function ProductionDashboardPage() {
     [setChartLayoutState]
   );
 
-  // Tầng 1: công đoạn — luôn tải, là cửa vào duy nhất của cascade.
-  // stageList = [{ id: 'SMT', deptCode: 'VN001' }, ...]
   const { data: stageList } = useStages();
   const processes =
     Array.isArray(stageList) && stageList.length > 0
       ? stageList.map((s) => (typeof s === 'string' ? s : s.id))
       : DASHBOARD_CONFIG.processes;
 
-  // GET_MFG_BY_LINE dùng để suy công đoạn khi mở thẳng URL ?line=.
   const { data: mfgInfo } = useMfgByLine(lineId);
   const process = processChoice ?? mfgInfo?.mfgType ?? null;
 
-  // deptCode là MfgCode (VN001/VN002/VN003) — payload MD004 cho PRODUCTION_LINE
-  // Ưu tiên từ mfgInfo (nhanh hơn, không phụ thuộc lineConfig)
   const deptCode = useMemo(() => {
     if (mfgInfo?.mfgCode) return mfgInfo.mfgCode;
     if (!process || !Array.isArray(stageList)) return null;
@@ -124,19 +112,14 @@ export function ProductionDashboardPage() {
     return found?.deptCode ?? null;
   }, [mfgInfo?.mfgCode, process, stageList]);
 
-  // Tầng 2+3: chuyền và WO load sau tầng trước.
   const { data: lines = [], isLoading: linesLoading } = useLines(deptCode);
   const { data: woList = [], isLoading: woLoading } = useMoByLine(
     lineId,
     dateKey.replace(/-/g, '')
   );
-  // WO đang chọn — bắt buộc 1 WO cụ thể (flow chạy theo MO).
   const selectedWo = woValue ? (woList.find((w) => w.mo === woValue) ?? null) : null;
-  // model dùng cho getModelProfile/getModelStations — lấy partNumber của WO đang chọn
   const model = selectedWo?.partNumber ?? 'ALL';
 
-  // Tầng cuối: 5 nguồn độc lập — chỉ fetch SAU KHI ấn Tra cứu (snapshot
-  // `applied`), đổi filter mà chưa tra cứu lại thì số liệu cũ giữ nguyên.
   const group = process ?? mfgInfo?.mfgType ?? null;
   const [applied, setApplied] = useState(null);
   const canSearch = Boolean(lineId && shift && group && woValue);
@@ -147,9 +130,6 @@ export function ProductionDashboardPage() {
     mo: applied?.mo ?? null,
     date: applied?.date ?? null,
     shift: applied?.shift ?? null,
-    // Chế độ xem KHÔNG nằm trong snapshot `applied`: nó là chuyển chế độ
-    // xem chứ không phải đổi bộ lọc, nên bấm là query lại luôn — bắt người
-    // dùng bấm thêm "Tra cứu" chỉ để đổi kiểu xem thì rất khó chịu.
     scope: scopeId,
     enabled: Boolean(applied),
   });
@@ -166,9 +146,7 @@ export function ProductionDashboardPage() {
     parts,
     flowStations,
   } = query;
-  // Thẻ "UPH THỰC TẾ" hiện thêm dòng "UPH mục tiêu". Số này chưa có nguồn thật
-  // nên tạm lấy từ file cấu hình; hàm getTargetUph tự ưu tiên giá trị API nếu
-  // sau này bảng tạm được IE nhập thật.
+
   const viewData = useMemo(() => {
     if (!data) return null;
     return {
@@ -179,18 +157,14 @@ export function ProductionDashboardPage() {
       },
     };
   }, [data, process, lineId]);
-  // Hỏng lẻ tẻ (mất mạng chập chờn) thì các kỳ poll sau tự hồi phục — chỉ khi
-  // hỏng LIÊN TIẾP đủ ngưỡng mới coi như sập hẳn, giống trang Tổng quan.
+
   const { count: consecutiveFailures, reset: resetFailures } =
     useConsecutiveFailures(failureReason);
 
-  // Stations quy trình: GET_WIP_REPORT > GET_FLOW_BY_MO. WIP report đúng thứ
-  // tự trạm của API và có kèm SL (qty) từ flow.
   const lineConfig = useMemo(() => {
     if (!applied?.lineId) return null;
 
     const wipIds = new Set((viewData?.stations ?? []).map((s) => s.stationId));
-    // Gộp Qty của flow vào danh sách trạm WIP (WIP không trả qty).
     const flowQty = new Map(flowStations.map((s) => [s.id, s.qty]));
     const stationsFromWip = (viewData?.stations ?? []).map((s) => ({
       id: s.stationId,
@@ -198,8 +172,7 @@ export function ProductionDashboardPage() {
       shortName: s.opName || s.stationName || s.stationId,
       qty: flowQty.get(s.stationId) ?? null,
     }));
-    // Trạm nào có trong flow nhưng không có trong WIP thì vẫn giữ lại để
-    // không mất bước nào khỏi quy trình.
+
     const missingInWip = flowStations
       .filter((s) => !wipIds.has(s.id))
       .map((s) => ({ id: s.id, name: s.name, shortName: s.shortName, qty: s.qty ?? null }));
@@ -221,12 +194,9 @@ export function ProductionDashboardPage() {
 
   const flowLoading = parts.some((p) => p.key === 'flow' && p.status === 'loading');
 
-  // Thẻ thông tin MO gọi GET_MO_INFO riêng sau khi đã tra cứu.
   const { data: moInfo } = useMoInfo(applied?.mo ?? null, Boolean(applied));
   const displayWo = moInfo ?? selectedWo;
 
-  // Toast warning một lần khi WO load xong nhưng không có WO nào trong ngày.
-  // Chỉ cảnh báo sau khi đã tra cứu — chọn filter mà chưa tra thì không réo.
   const woToastFiredRef = useRef(false);
   useEffect(() => {
     if (!woLoading && applied && Boolean(lineId)) {
@@ -239,21 +209,15 @@ export function ProductionDashboardPage() {
           timeout: 5000,
         });
       }
-      // Reset khi đổi line hoặc ngày
       if (woList.length > 0) woToastFiredRef.current = false;
     }
   }, [woLoading, applied, lineId, woList.length, copy.kpi.moInfo, copy.kpi.noWo]);
 
-  // Tên hiển thị của chuyền đang chọn — ưu tiên từ lines array, fallback lineId
   const lineLabel = useMemo(() => {
     if (!lineId) return '';
     return lines.find((l) => l.id === lineId)?.name ?? lineConfig?.name ?? lineId;
   }, [lineId, lines, lineConfig]);
 
-  // Label WO đang chọn cho trigger display. Không useMemo: selectedWo là
-  // object do React Query trả lại, React Compiler không giữ được memo thủ
-  // công (react-hooks/preserve-manual-memoization) và chuỗi rút ngắn này
-  // rẻ hơn chi phí memo.
   const woLabel = !woValue ? '' : (selectedWo?.mo ?? woValue);
   const modelProfile = lineConfig ? getModelProfile(lineConfig, model) : null;
   const modelStations = useMemo(
@@ -265,8 +229,6 @@ export function ProductionDashboardPage() {
     [lineConfig, modelStations]
   );
 
-  // Đồng hồ chạy giờ thật, tick mỗi giây. Đổi ngày/ca không chỉnh đồng hồ:
-  // giờ hiển thị và giờ truy vấn luôn là "bây giờ".
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTime((currentTime) => new Date(currentTime.getTime() + 1000));
@@ -276,9 +238,6 @@ export function ProductionDashboardPage() {
   }, []);
 
   useEffect(() => {
-    // So với documentElement (cả tài liệu) chứ không phải thẻ main: mọi popup
-    // (dialog cài đặt, select, tooltip, toast) đều portal ra document.body —
-    // fullscreen thẻ main sẽ che hết chúng, bấm không thấy gì.
     const syncFullscreenState = () => {
       setIsFullscreen(document.fullscreenElement === document.documentElement);
     };
@@ -323,7 +282,6 @@ export function ProductionDashboardPage() {
 
     if (!loadingOverlayVisible) return undefined;
 
-    // Mount lần đầu startedAt còn null → tính như vừa hiện, giữ đủ min-visible.
     const elapsed =
       loadingOverlayStartedAt.current === null ? 0 : Date.now() - loadingOverlayStartedAt.current;
     const remaining = Math.max(0, INITIAL_LOADING_OVERLAY_MIN_VISIBLE_MS - elapsed);
@@ -335,27 +293,13 @@ export function ProductionDashboardPage() {
   const globalError = isError && !viewData;
   const isDisconnected = isRefetchError || globalError;
 
-  // Khung giờ phải biết trước danh sách trạm: trạng thái mỗi trạm dựa vào
-  // % đạt của khung vừa kết thúc.
-  // Trạng thái khung giờ chỉ đổi theo PHÚT (getSlotState chỉ đọc giờ+phút),
-  // nên chốt theo phút: đồng hồ trang tick mỗi giây nhưng mảng này giữ
-  // nguyên identity, các khối memo bên dưới không dựng lại vô ích.
   const clockMinuteKey = Math.floor(clockTime.getTime() / 60000);
-  // Đồng hồ chốt theo PHÚT: tick mỗi giây nhưng Date này chỉ đổi identity mỗi
-  // phút, nên các khối memo bên dưới không dựng lại 60 lần/phút.
   const clockMinuteDate = useMemo(() => new Date(clockMinuteKey * 60000), [clockMinuteKey]);
   const todayKey = useMemo(() => format(clockMinuteDate, 'yyyy-MM-dd'), [clockMinuteDate]);
   const slotStates = useMemo(() => {
     const slotList = slots ?? [];
     if (!slotList.length) return [];
-    // Phạm vi 'Cả WO': 6 nhóm ngày đều là quá khứ/nửa quá khứ — không có khung
-    // "chưa tới" hay "đang chạy" theo giờ đồng hồ. Nhóm cuối có thể đang chạy
-    // một phần thì số hiện ra vẫn đúng là thực tế đã làm được tới giờ.
     if (scopeId === 'WO') return slotList.map(() => 'complete');
-    // Trạng thái khung giờ phải so với NGÀY ĐANG XEM, không phải đồng hồ thật.
-    // Xem ca của ngày hôm qua thì mọi khung đã xong; xem ngày mai thì chưa tới khung nào.
-    // Nếu chỉ dùng đồng hồ thật thì lúc 01:00 mọi khung của ca ngày đều bị coi là
-    // "chưa tới" và 6 cột % đạt trống trơn.
     if (dateKey < todayKey) return slotList.map(() => 'complete');
     if (dateKey > todayKey) return slotList.map(() => 'future');
     return slotList.map((slot) => getSlotState(slot, clockMinuteDate, shift));
@@ -363,13 +307,9 @@ export function ProductionDashboardPage() {
   const lastCompletedSlotIndex = useMemo(() => {
     const current = slotStates.indexOf('current');
     if (current > 0) return current - 1;
-    // Ca đã xong / chưa vào ca: khung "vừa kết thúc" là khung hoàn thành cuối cùng.
     return slotStates.lastIndexOf('complete');
   }, [slotStates]);
-  // Đang xem ca hôm nay thì mới xét quy tắc "im lặng > 30' = Dừng"; ca đã qua
-  // thì mọi trạm cách giờ hiện tại hàng giờ, áp dụng sẽ xám cả bảng.
   const isViewingCurrentShift = useMemo(() => dateKey === todayKey, [dateKey, todayKey]);
-  // Giờ kết thúc của ca đang xem (ca đêm endMinute = 1920 -> 08:00 hôm sau).
   const shiftEndDate = useMemo(() => {
     const slots = shift?.slots ?? [];
     const endMinute = slots.at(-1)?.endMinute ?? 1440;
@@ -378,13 +318,8 @@ export function ProductionDashboardPage() {
     return end;
   }, [dateKey, shift]);
 
-  // GET_WIP_REPORT là nguồn đầy đủ nhất (đủ plan/thực tế/UPH/NG + tên công đoạn)
-  // nên khi có nó thì dùng làm danh sách trạm thay cho config. Như vậy bảng,
-  // dải quy trình và KPI cùng đọc MỘT danh sách — không lệch dòng với nhau.
   const stationRows = useMemo(() => {
     const apiStations = viewData?.stations ?? [];
-    // Mốc so sánh cho quy tắc "im lặng": ca hiện tại dùng đồng hồ thật,
-    // ca đã qua dùng giờ kết thúc ca để không xám cả bảng.
     const statusNow = isViewingCurrentShift ? clockMinuteDate : shiftEndDate;
 
     if (apiStations.length > 0) {
@@ -396,8 +331,6 @@ export function ProductionDashboardPage() {
           name,
           shortName: name,
           stationId: station.stationId,
-          // UPH mục tiêu: API trả sẵn UPH_TARGET, thiếu thì lấy số tạm trong
-          // dashboard-target-uph.js. Cùng một hàm cho cả cột bảng và thẻ KPI.
           targetUph: getTargetUph({
             process,
             line: station.line ?? lineId,
@@ -458,11 +391,6 @@ export function ProductionDashboardPage() {
       ? format(new Date(viewData.updatedAt), 'HH:mm:ss')
       : '—';
 
-  // Các handler dưới đây KHÔNG bọc useCallback: dự án bật React Compiler
-  // (babel-plugin-react-compiler), compiler tự quyết định phần nào cần
-  // memo. useCallback thủ công chỉ gây xung đột dependency với compiler
-  // (react-hooks/preserve-manual-memoization).
-
   function handleLineChangeFromHeader(nextLineId) {
     if (!nextLineId || typeof nextLineId !== 'string') return;
     setWoValue(null);
@@ -494,8 +422,6 @@ export function ProductionDashboardPage() {
     );
   }
 
-  // Đổi công đoạn thì rớt cả chuyền đã chọn: chuyền cũ không thuộc công đoạn
-  // mới, giữ lại chỉ gây nhầm. KHÔNG tự chọn chuyền đầu — người dùng chọn tay.
   function handleProcessChange(nextProcess) {
     if (!nextProcess || nextProcess === process) return;
     setProcessChoice(nextProcess);
@@ -513,8 +439,6 @@ export function ProductionDashboardPage() {
 
   function handleDateChange(date) {
     if (!date) return;
-    // WO phụ thuộc ngày: đổi sang ngày khác thì WO cũ mất hiệu lực,
-    // reset về rỗng để không rơi vào trạng thái WO "ma".
     if (format(date, 'yyyy-MM-dd') !== dateKey) {
       setWoValue(null);
       woToastFiredRef.current = false;
@@ -534,11 +458,9 @@ export function ProductionDashboardPage() {
   }
 
   function handleScopeChange(nextScopeId) {
-    // KHÔNG setApplied(null) — giữ nguyên bộ lọc đang xem, chỉ đổi chế độ.
     setScopeId(nextScopeId);
   }
 
-  // Chốt snapshot tra cứu: data phía dưới chỉ query theo snapshot này.
   function handleSearch() {
     if (!lineId || !shift || !group || !woValue) return;
     setApplied({
@@ -606,6 +528,7 @@ export function ProductionDashboardPage() {
             clockTime={clockTime}
             lastUpdated={lastUpdated}
             isFetching={isFetching && !isLoading}
+            isSearching={isLoading || isFetching}
             isDisconnected={isDisconnected}
             isFullscreen={isFullscreen}
             fullscreenUnsupported={fullscreenUnsupported}
@@ -630,7 +553,7 @@ export function ProductionDashboardPage() {
             <CascadeGate title={copy.cascade.searchTitle} hint={copy.cascade.searchHint} />
           ) : !lineConfig ? (
             flowLoading ? (
-              <CascadeGate title={copy.loading} hint={copy.cascade.flowHint} />
+              <CascadeGate title={copy.loading} hint={copy.cascade.flowHint} loading />
             ) : (
               <CascadeGate
                 title={copy.cascade.flowTitle}
@@ -666,15 +589,7 @@ export function ProductionDashboardPage() {
               />
               <div
                 className={cn(
-                  // flex-1 để hút phần dư viewport khi màn cao; KHÔNG min-h-0 để
-                  // lưới không bao giờ bị bóp dưới cỡ nội dung — thiếu chỗ thì
-                  // layout dài ra và trang cuộn, thay vì cắt chart/legend.
-                  // items-start: thẻ bảng ôm khít số dòng hiện có, chỗ dư còn lại
-                  // là nền trang (vô hình) chứ không thành mảng trắng trong thẻ.
                   'grid flex-1 grid-cols-1 items-start gap-2.5 xl:gap-3',
-                  // Hàng biểu đồ `auto`: từng hàng chart (1 hàng ở 3 cột, 2 hàng ở
-                  // 2 cột) cao theo nội dung, không bao giờ tràn hay bóp chart.
-                  // Phần dư viewport dồn cho bảng (1fr, tối thiểu 200px ~ 4 dòng).
                   chartLayout === 'compact'
                     ? 'xl:grid-rows-[auto_auto_minmax(200px,1fr)_auto]'
                     : 'xl:grid-rows-none'
@@ -733,7 +648,6 @@ export function ProductionDashboardPage() {
           )}
         </div>
         <LoadingOverlay active={loadingOverlayVisible} label={copy.loading} />
-        {/* Chỉ mount khi mở: đóng là gỡ ngay, không phụ thuộc animation đóng. */}
         {linePickerOpen ? (
           <LinePickerDialog
             open
@@ -748,10 +662,11 @@ export function ProductionDashboardPage() {
   );
 }
 
-function CascadeGate({ title, hint, action }) {
+function CascadeGate({ title, hint, action, loading = false }) {
   return (
     <Empty className="flex-1 border border-solid border-border bg-surface py-16">
       <EmptyHeader>
+        {loading ? <Spinner className="mx-auto mb-2 text-production-blue" label={title} /> : null}
         <EmptyTitle className="text-base">{title}</EmptyTitle>
         <EmptyDescription>{hint}</EmptyDescription>
       </EmptyHeader>

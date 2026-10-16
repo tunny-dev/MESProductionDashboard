@@ -1,20 +1,3 @@
-/**
- * Store bộ lọc dùng chung cho trang Tổng quan và trang Biểu đồ ngày.
- *
- * Vì sao dùng zustand thay vì URL: bộ lọc sống qua nhiều màn và cần "giữ chỗ"
- * khi điều hướng. Khi muốn chia sẻ bộ lọc qua link (doc mục 2: "Mở bộ lọc này
- * trên màn hình TV") thì đọc từ store và dựng URL, không để bộ lọc nằm trong
- * URL sẵn.
- *
- * Chỉ lưu bộ lọc, không lưu dữ liệu: dữ liệu là của react-query.
- *
- * Vì sao nằm ở `src/store/` chứ không ở `features/production/store/`: đây là
- * store dùng chung cho NHIỀU feature (trang Tổng quan, trang Biểu đồ, màn TV),
- * nên nó không thuộc về riêng feature nào. Mọi store zustand của app đặt cùng
- * cấp `src`, còn dữ liệu chỉ dùng trong một feature thì để `useQuery` trong
- * feature đó, không dựng store.
- */
-
 import { format } from 'date-fns';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -76,15 +59,8 @@ export const useFilterStore = create()(
   )
 );
 
-/** Bộ lọc mặc định dùng khi muốn một bản sạch, không đọc từ store đã lưu. */
 export const DEFAULT_FILTERS = INITIAL_FILTERS;
 
-/**
- * Bộ lọc có đang lọc gì không.
- *
- * Suy ra từ bộ lọc chứ không lưu trong store: hai nơi cùng giữ một cờ boolean
- * là chỗ chúng lệch nhau. Ô tìm đã có nút X riêng, nên chỉ tính xưởng và trạng thái.
- */
 export function hasActiveFilters(filters) {
   return (
     Boolean(filters.areaId) ||
@@ -93,16 +69,6 @@ export function hasActiveFilters(filters) {
   );
 }
 
-/**
- * Đọc bộ lọc từ store.
- *
- * PHẢI bọc `useShallow`: selector trả về object mới sẽ khác tham chiếu mỗi
- * lần render, React so sánh bằng tham chiếu và render lại vô hạn — lỗi
- * "getSnapshot should be cached" / "Maximum update depth exceeded".
- *
- * Chọn 3 giá trị rời thì không cần useShallow, nhưng dùng chung một cách gọi ở
- * mọi trang để không phải nhớ quy tắc theo từng chỗ.
- */
 export function useFilters() {
   return useFilterStore(
     useShallow((state) => ({
@@ -115,7 +81,6 @@ export function useFilters() {
   );
 }
 
-/** Gọi action của store: các hàm này giữ nguyên tham chiếu nên không cần shallow. */
 export function useFilterActions() {
   return useFilterStore(
     useShallow((state) => ({
@@ -124,13 +89,6 @@ export function useFilterActions() {
     }))
   );
 }
-
-/**
- * Lọc danh sách line theo bộ lọc.
- *
- * `status: 'attention'` là nhóm gộp (cảnh báo + trễ + dừng), vì người xem
- * hỏi "có gì cần xử lý" chứ không phải "loại nào trong ba loại".
- */
 export function applyFilters(lines, filters) {
   const query = filters.query?.trim().toLowerCase() ?? '';
 

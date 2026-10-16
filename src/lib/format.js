@@ -1,14 +1,7 @@
 import { i18n } from '@/i18n';
 
-/** Ký hiệu ô trống: đúng một ký hiệu cho mọi ô trống của app (luật T18). */
 export const EMPTY_DASH = '—';
 
-/**
- * Locale số theo ngôn ngữ đang chọn.
- *
- * `zh` khai `zh-CN`: `Intl` biết `zh` nhưng vài bản runtime yêu cầu mã vùng đầy
- * đủ, không có thì ném lỗi lúc dựng trang.
- */
 function getLocale() {
   const code = i18n.language ?? 'vi';
   return code === 'zh' ? 'zh-CN' : code;

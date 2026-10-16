@@ -13,7 +13,7 @@ export const DEFAULT_FACTORY = import.meta.env.VITE_MES_FACTORY || 'VN';
  */
 export async function getStages({ factory = DEFAULT_FACTORY } = {}) {
   const rows = await mesPost(
-    MES_S_CODES.production.stages,
+    MES_S_CODES.production.getMfgType,
     { P_DC003: factory ?? DEFAULT_FACTORY },
     PRODUCTION_SYSTEM
   );

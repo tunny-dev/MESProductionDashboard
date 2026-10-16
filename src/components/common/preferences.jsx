@@ -1,4 +1,3 @@
-
 import { useTranslation } from 'react-i18next';
 import { Check, Globe, Laptop, Moon, Settings2, Sun, X } from 'lucide-react';
 
@@ -101,13 +100,14 @@ function ThemeSwitcherMenu({ className, contentStyle, theme, resolvedTheme, onTh
   );
 }
 
-export function ThemeSwitcher({ className }) {
+export function ThemeSwitcher({ className, contentStyle }) {
   const { t } = useTranslation();
   const { theme, resolvedTheme, setTheme } = useTheme();
 
   return (
     <ThemeSwitcherMenu
       className={className}
+      contentStyle={contentStyle}
       theme={theme}
       resolvedTheme={resolvedTheme}
       onThemeChange={setTheme}

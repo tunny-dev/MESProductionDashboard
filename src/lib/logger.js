@@ -36,7 +36,6 @@ class Logger {
     this.#level = level;
   }
 
-  /** Thay đổi level tối thiểu tại runtime (dùng trong test hoặc DevTools). */
   setLevel(level) {
     if (!(level in LEVEL_RANK)) {
       console.warn(`[logger] Unknown level "${level}", ignored.`);

@@ -1,10 +1,3 @@
-/**
- * Dữ liệu dashboard một chuyền — 5 nguồn query ĐỘC LẬP (summary / plan /
- * hourly / uphTrend / flow), hỏng nguồn nào chỉ chết nguồn đó.
- *
- * Trả về view gộp `data` cho UI cũ + `parts` cho màn debug soi từng phần.
- */
-
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
 
@@ -61,10 +54,6 @@ export function useDashboardData({
   const flowReady = ready && Boolean(mo);
   const args = { dateStr, dept, shift: shiftCode, lineId, mo, model, scope: scopeCode };
 
-  // KHÔNG gọi Production_1_1_4 nữa: câu đó lọc theo (ngày, công đoạn) mà không
-  // có MO / chuyền, nên khi bảng trạm lỗi nó lấp vào danh sách trạm và gộp
-  // mọi WO của công đoạn vào cùng một bảng. Cũng không gọi Production_1_1_6:
-  // kế hoạch lấy từ SSFMF.MF008 ngay trong GET_SUMMARY / GET_WIP_REPORT.
   const [moSummaryQ, wipQ, hourlyQ, uphQ, flowQ] = useQueries({
     queries: [
       {
@@ -153,7 +142,6 @@ export function useDashboardData({
     ],
   });
 
-  // View-model từng phần cho màn debug — có params ngay cả khi chưa load.
   const parts = useMemo(
     () => [
       toPartView('moSummary', 'Tổng nhập/xuất WO', moSummaryQ, () => argsFor('moSummary', args)),
@@ -197,18 +185,12 @@ export function useDashboardData({
     ]
   );
 
-  // Stations cho FlowStrip từ GET_FLOW_BY_MO — thay DASH_LINE_CONFIG còn thiếu.
   const flowStations = useMemo(
     () => (flowQ.data ? normalizeFlowRows(flowQ.data.rows) : []),
     [flowQ.data]
   );
 
-  // Bộ 6 khung đang dùng. Tính ra một chỗ rồi đưa vào cả normalize lẫn
-  // component, để nhãn trục X và dữ liệu luôn cùng một bộ — lệch nhau là
-  // biểu đồ trắng.
   const slots = useMemo(() => {
-    // Khoảng ngày lấy thẳng từ rows, chưa qua merge — cần để dựng khung
-    // trước khi gộp.
     const summary = normalizeMoSummaryRows(moSummaryQ.data?.rows);
     return getActiveSlots({
       scope: scopeCode,
@@ -218,13 +200,9 @@ export function useDashboardData({
     });
   }, [scopeCode, shift, moSummaryQ.data]);
 
-  // View gộp cho UI — nền là GET_WIP_REPORT (bảng trạm), tổng nhập/xuất lấy
-  // từ GET_SUMMARY. Hai nguồn giờ thiếu thì dùng giá trị rỗng.
   const data = useMemo(() => {
     if (!wipQ.data && !moSummaryQ.data) return null;
     const stations = wipQ.data ? normalizeWipReportRows(wipQ.data.rows, slots) : [];
-    // Trạm cuối của 2 API biểu đồ = MAX(seq) trong cùng bộ lọc — trùng với
-    // `stationRows.at(-1)` mà trang truyền vào `finalStationId`.
     return {
       ...mergeDashboardData({
         chartOutputRows: hourlyQ.data?.rows ?? [],
@@ -279,7 +257,6 @@ export function useDashboardData({
   };
 }
 
-/** Params sẽ gửi đi của từng phần — tính sẵn để debug dù query chưa chạy. */
 function argsFor(key, args) {
   if (key === 'chartOutput' || key === 'chartUph')
     return {
@@ -323,11 +300,11 @@ function argsFor(key, args) {
 }
 
 const PART_S_CODES = () => ({
-  moSummary: MES_S_CODES.production.moSummary,
-  wipReport: MES_S_CODES.production.wipReport,
-  hourly: MES_S_CODES.production.chartOutput,
-  uphTrend: MES_S_CODES.production.chartUph,
-  flow: MES_S_CODES.production.flowByMo,
+  moSummary: MES_S_CODES.production.getMoSummary,
+  wipReport: MES_S_CODES.production.getWipReport,
+  hourly: MES_S_CODES.production.getProductionAchievement,
+  uphTrend: MES_S_CODES.production.getUphTrend,
+  flow: MES_S_CODES.production.getFlowByMo,
 });
 
 function toPartView(key, label, query, getArgs) {

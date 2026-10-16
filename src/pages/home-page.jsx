@@ -24,12 +24,10 @@ const CARDS = [
     descriptionKey: 'home.overviewDescription',
     tint: 'bg-production-green/10 border-production-green/30 hover:border-production-green/60',
     chip: 'bg-production-green/15 text-production-green',
-    // TEMP — thẻ này khoá với user ngoài OVERVIEW_ALLOWED_USER_IDS.
     overviewLocked: true,
   },
 ];
 
-/** Ruột thẻ dùng chung cho cả trạng thái mở và khoá. */
 function cardBody(card, locked, t) {
   return (
     <>
@@ -61,7 +59,6 @@ function cardBody(card, locked, t) {
 export function HomePage() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
-  // K00136 (admin) vào full; user khác bị khoá thẻ Tổng quan.
   const overviewLocked = !canAccessOverview(user);
 
   return (

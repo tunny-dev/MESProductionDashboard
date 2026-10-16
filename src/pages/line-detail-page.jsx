@@ -1,16 +1,6 @@
-/**
- * TRANG CHI TIẾT LINE (doc mục 2, trang 2).
- *
- * Cấu trúc: đầu trang (tên line + ô đổi nhanh sang line khác) → dải KPI của
- * riêng line này → biểu đồ luỹ tiến cả ca → bảng sản lượng theo giờ → thông
- * tin dừng line.
- *
- * Đây là trang CÓ đầu trang riêng: <h1> là tên line, thanh header chỉ ghi cấp cha.
- */
-
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, PauseCircle, RotateCw, SearchX } from 'lucide-react';
+import { ArrowLeft, PauseCircle, RotateCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { ErrorPrimaryButton, ErrorScreen } from '@/components/common/error-screen';
@@ -52,8 +42,6 @@ export function LineDetailPage() {
   }
   if (error) return <LineError onRetry={refetch} />;
   if (isLoading || !view) {
-    // Khung chờ + lớp phủ: người xem biết đang chờ, và khung vẫn đúng hình trang
-    // nên lúc dữ liệu về không nhảy.
     return (
       <div className="relative">
         <LoadingOverlay active label={t('freshness.loading')} />
@@ -105,13 +93,6 @@ export function LineDetailPage() {
   );
 }
 
-/**
- * Ô đổi nhanh sang line khác.
- *
- * Điều hướng bằng `navigate` chứ không đổi state: route đã có sẵn `:lineId`, đổi
- * nó là đúng nghĩa — người dùng bấm Back sau khi đổi line vẫn quay lại line cũ.
- * Giữ state trong trang sẽ phải tự dựng lại lịch sử điều hướng.
- */
 function LineSwitcher({ lines, currentId }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -119,7 +100,6 @@ function LineSwitcher({ lines, currentId }) {
   return (
     <div className="flex shrink-0 items-center gap-2">
       <span className="text-xs text-muted-foreground">{t('lineDetail.switchLine')}</span>
-      {/* `items`: như bộ lọc xưởng — thiếu thì trigger hiện value thô. */}
       <Select
         value={currentId}
         onValueChange={(value) => navigate(`/overview/line/${encodeURIComponent(value)}`)}
@@ -140,20 +120,14 @@ function LineSwitcher({ lines, currentId }) {
   );
 }
 
-/** Chữ sau mũi tên trên nút quay lại. Tách riêng vì cần hook dịch. */
 function BackLabel() {
   const { t } = useTranslation();
   return t('lineDetail.backToOverview');
 }
 
-/* -------------------------------------------------------------------------- */
-/*  KPI riêng của line                                                         */
-/* -------------------------------------------------------------------------- */
-
 function LineKpis({ detail }) {
   const { t } = useTranslation();
 
-  // Năm ô: số lẻ nên mobile đi thẳng một cột thay vì 2×2 có ô đứng lẻ (luật charts.md).
   const tiles = [
     {
       label: t('lineDetail.actual'),
@@ -205,8 +179,6 @@ function CumulativeSection({ detail, view }) {
 
   return (
     <section className="rounded-lg border border-border bg-surface">
-      {/* Xếp chồng sẵn ở màn hẹp: với flex-wrap, phần giờ ca hay rớt xuống một
-          dòng lẻ (luật R3). Giống header của trang biểu đồ ngày. */}
       <header className="flex flex-col gap-0.5 border-b border-border px-4 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
         <h3 className="text-base font-semibold text-foreground">
           {t('lineDetail.cumulativeTitle')}
@@ -228,15 +200,9 @@ function CumulativeSection({ detail, view }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Bảng theo giờ                                                             */
-/* -------------------------------------------------------------------------- */
-
 function HourlyTable({ detail }) {
   const { t } = useTranslation();
 
-  // Chỉ hiện tới giờ hiện tại: giờ tương lai có số 0 ở mọi cột, đọc như line chưa
-  // chạy tới chứ không phải "chưa có dữ liệu".
   const rows = detail.buckets.filter((bucket) => !bucket.isFuture);
 
   return (
@@ -273,7 +239,6 @@ function HourlyTable({ detail }) {
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((bucket) => (
-              // Không bấm được thì không tô nền khi rê (luật I9).
               <tr key={bucket.hourMinutes} className="h-9">
                 <td className="px-3 py-1.5 table-nums">{bucket.label}</td>
                 <td className="px-3 py-1.5 text-right table-nums font-medium">
@@ -292,7 +257,6 @@ function HourlyTable({ detail }) {
                   {formatInt(bucket.gap)}
                 </td>
                 <td className="px-3 py-1.5 text-right table-nums">
-                  {/* Cột xanh nếu >= 90% target của khung giờ đó (doc mục 3) */}
                   <span
                     className={cn(
                       bucket.achievement === null
@@ -317,7 +281,6 @@ function HourlyTable({ detail }) {
   );
 }
 
-/** Ghi chú khung giờ: nghỉ thì nêu số phút, dừng thì nêu lý do. */
 function HourlyNote({ bucket }) {
   const { t } = useTranslation();
 
@@ -341,15 +304,9 @@ function HourlyNote({ bucket }) {
   return <span className="text-muted-foreground">{EMPTY_DASH}</span>;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Thông tin dừng line                                                       */
-/* -------------------------------------------------------------------------- */
-
 function StopInfo({ detail }) {
   const { t } = useTranslation();
 
-  // Mọi lần dừng trong ca đều liệt kê, kể cả lúc đang diễn ra: người xem cần thấy
-  // "đang dừng" chứ không chỉ lịch sử lúc đã xong.
   const stops = detail.stops;
 
   if (stops.length === 0) {
@@ -386,21 +343,11 @@ function StopInfo({ detail }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Trạng thái                                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Line không có trong dữ liệu. Đứng một mình y như mọi trang lỗi khác, dùng
- * chung khung `ErrorScreen` — nút đặc là "Về danh sách", không phải "Về tổng
- * quan": người mở một line hỏng gần như luôn muốn tìm line khác.
- */
 function LineNotFound({ lineId }) {
   const { t } = useTranslation();
 
   return (
     <ErrorScreen
-      icon={SearchX}
       code="404"
       title={t('error.lineNotFoundTitle', { lineId })}
       message={t('error.lineNotFoundDescription')}

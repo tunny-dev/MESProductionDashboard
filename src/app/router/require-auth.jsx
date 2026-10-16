@@ -16,11 +16,6 @@ export function RequireAuth({ children }) {
   return children;
 }
 
-/**
- * TEMP — user ngoài OVERVIEW_ALLOWED_USER_IDS không được vào Tổng quan
- * (kèm line/chart). Gõ URL trực tiếp thì gặp màn 403.
- * Xem OVERVIEW_ALLOWED_USER_IDS trong config/app.js, xoá cùng khi có quyền thật.
- */
 export function RequireOverviewAccess({ children }) {
   const user = useAuthStore((state) => state.user);
 

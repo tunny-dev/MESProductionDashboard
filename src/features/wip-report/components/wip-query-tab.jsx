@@ -28,9 +28,9 @@ const EMPTY_FORM = {
   moCreateDateFrom: null,
   moCreateDateTo: null,
   moDays: '',
-  models: [],  // multi-select array (part code)
-  lines: [],   // multi-select array
-  mos: [],     // multi-select array
+  models: [], // multi-select array (part code)
+  lines: [], // multi-select array
+  mos: [], // multi-select array
 };
 
 export function WipQueryTab({ onQuery }) {
@@ -38,8 +38,6 @@ export function WipQueryTab({ onQuery }) {
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
 
-  // Reset dependent fields when mfgType changes — làm trong handler
-  // thay vì useEffect để tránh setState đồng bộ trong effect.
   function handleMfgType(type) {
     setForm((prev) => ({ ...prev, mfgType: type, models: [], lines: [], mos: [] }));
   }
@@ -63,7 +61,6 @@ export function WipQueryTab({ onQuery }) {
     setForm(EMPTY_FORM);
   }
 
-  // MO Create Date bắt buộc — thiếu ngày thì không cho Query.
   const canQuery = Boolean(form.moCreateDateFrom && form.moCreateDateTo);
 
   function handleQuery() {
@@ -76,15 +73,12 @@ export function WipQueryTab({ onQuery }) {
       moCreateDateFrom: form.moCreateDateFrom
         ? format(form.moCreateDateFrom, 'yyyy/MM/dd')
         : undefined,
-      moCreateDateTo: form.moCreateDateTo
-        ? format(form.moCreateDateTo, 'yyyy/MM/dd')
-        : undefined,
+      moCreateDateTo: form.moCreateDateTo ? format(form.moCreateDateTo, 'yyyy/MM/dd') : undefined,
     });
   }
 
   return (
     <div className="w-full max-w-2xl">
-      {/* MFG Type */}
       <FormRow label="MFG Type" required>
         <div className="flex flex-wrap gap-4">
           {MFG_TYPES.map((type) => (
@@ -103,21 +97,26 @@ export function WipQueryTab({ onQuery }) {
         </div>
       </FormRow>
 
-      {/* MO Create Date */}
       <FormRow label="MO Create Date" required>
         <div className="flex flex-wrap items-center gap-2">
           <DateButton
             value={form.moCreateDateFrom}
             open={fromOpen}
             onOpenChange={setFromOpen}
-            onSelect={(d) => { set('moCreateDateFrom', d); setFromOpen(false); }}
+            onSelect={(d) => {
+              set('moCreateDateFrom', d);
+              setFromOpen(false);
+            }}
           />
           <span className="text-muted-foreground">-</span>
           <DateButton
             value={form.moCreateDateTo}
             open={toOpen}
             onOpenChange={setToOpen}
-            onSelect={(d) => { set('moCreateDateTo', d); setToOpen(false); }}
+            onSelect={(d) => {
+              set('moCreateDateTo', d);
+              setToOpen(false);
+            }}
           />
           <span className="rounded bg-warning-bg px-2 py-0.5 text-xs text-warning-text">
             Format: yyyy/mm/dd
@@ -125,7 +124,6 @@ export function WipQueryTab({ onQuery }) {
         </div>
       </FormRow>
 
-      {/* MO Days */}
       <FormRow label="MO Days">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">~</span>
@@ -137,7 +135,6 @@ export function WipQueryTab({ onQuery }) {
         </div>
       </FormRow>
 
-      {/* Model — multi-select dialog, hiện tên + mã part */}
       <FormRow label="Model">
         <MultiSelectDialog
           title="Select Models"
@@ -145,7 +142,7 @@ export function WipQueryTab({ onQuery }) {
           getLabel={(o) => {
             const name = o.name ?? o.NAME ?? '';
             const code = o.code ?? o.CODE ?? '';
-            return name && code && name !== code ? `${name} (${code})` : (name || code || String(o));
+            return name && code && name !== code ? `${name} (${code})` : name || code || String(o);
           }}
           getValue={(o) => o.code ?? o.CODE ?? String(o)}
           selected={form.models}
@@ -153,7 +150,6 @@ export function WipQueryTab({ onQuery }) {
         />
       </FormRow>
 
-      {/* Line — multi-select dialog, hiện mã + tên chuyền */}
       <FormRow label="Line">
         <MultiSelectDialog
           title="Select Lines"
@@ -161,7 +157,7 @@ export function WipQueryTab({ onQuery }) {
           getLabel={(o) => {
             const id = o.lineId ?? o.LINE ?? o.line ?? '';
             const name = o.lineName ?? o.LINE_NAME ?? '';
-            return id && name && name !== id ? `${id} – ${name}` : (id || name || String(o));
+            return id && name && name !== id ? `${id} – ${name}` : id || name || String(o);
           }}
           getValue={(o) => o.lineId ?? o.LINE ?? o.line ?? String(o)}
           selected={form.lines}
@@ -169,7 +165,6 @@ export function WipQueryTab({ onQuery }) {
         />
       </FormRow>
 
-      {/* MO — multi-select dialog */}
       <FormRow label="MO">
         <MultiSelectDialog
           title="Select MOs"
@@ -181,7 +176,6 @@ export function WipQueryTab({ onQuery }) {
         />
       </FormRow>
 
-      {/* Action buttons — ngày bắt buộc nên thiếu ngày thì khóa Query */}
       <div className="mt-6 flex items-center gap-3">
         <Button variant="outline" size="sm" onClick={handleClear} className="w-20">
           Clear
@@ -196,14 +190,14 @@ export function WipQueryTab({ onQuery }) {
           Query
         </Button>
         {!canQuery ? (
-          <span className="text-xs text-muted-foreground">Select MO Create Date to enable Query</span>
+          <span className="text-xs text-muted-foreground">
+            Select MO Create Date to enable Query
+          </span>
         ) : null}
       </div>
     </div>
   );
 }
-
-/* ─── Sub-components ──────────────────────────────────────────────────────── */
 
 function FormRow({ label, required, children }) {
   return (
@@ -217,7 +211,6 @@ function FormRow({ label, required, children }) {
   );
 }
 
-/** Hôm nay (đầu ngày) — ngày tạo MO không được vượt quá hôm nay. */
 const TODAY_START = (() => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -247,7 +240,6 @@ function DateButton({ value, open, onOpenChange, onSelect }) {
           selected={value}
           onSelect={onSelect}
           initialFocus
-          // MO Create Date không được quá ngày hiện tại.
           disabled={{ after: TODAY_START }}
         />
       </PopoverContent>
@@ -255,14 +247,9 @@ function DateButton({ value, open, onOpenChange, onSelect }) {
   );
 }
 
-/**
- * Trigger button that shows a dialog with a checklist of options.
- * Selected items are shown as removable tags on the trigger.
- */
 function MultiSelectDialog({ title, options, getLabel, getValue, selected, onChange }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  // draft inside the dialog — only commit on OK
   const [draft, setDraft] = useState(selected);
 
   function handleOpen() {
@@ -272,9 +259,7 @@ function MultiSelectDialog({ title, options, getLabel, getValue, selected, onCha
   }
 
   function toggle(val) {
-    setDraft((prev) =>
-      prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]
-    );
+    setDraft((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
   }
 
   function handleOk() {
@@ -286,17 +271,12 @@ function MultiSelectDialog({ title, options, getLabel, getValue, selected, onCha
     onChange(selected.filter((v) => v !== val));
   }
 
-  const filtered = options.filter((o) =>
-    getLabel(o).toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = options.filter((o) => getLabel(o).toLowerCase().includes(search.toLowerCase()));
 
-  // Fake options if API returns nothing yet (dev convenience)
   const displayOptions = filtered.length > 0 ? filtered : [];
 
   return (
     <div className="min-w-0 flex-1">
-      {/* Một nút duy nhất: tags đã chọn nằm gọn bên trong, trống thì hiện
-        placeholder. Bỏ kiểu cũ (tags ngoài + nút đếm riêng) vì rối và tốn chỗ. */}
       <Dialog open={open} onOpenChange={setOpen}>
         <Button
           variant="outline"
@@ -354,7 +334,6 @@ function MultiSelectDialog({ title, options, getLabel, getValue, selected, onCha
             autoFocus
           />
 
-          {/* Option list */}
           <div className="max-h-64 overflow-y-auto rounded border border-border">
             {displayOptions.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
@@ -392,11 +371,7 @@ function MultiSelectDialog({ title, options, getLabel, getValue, selected, onCha
           </div>
 
           <DialogFooter>
-            <DialogClose
-              render={<Button variant="outline" size="sm" />}
-            >
-              Cancel
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" size="sm" />}>Cancel</DialogClose>
             <Button size="sm" onClick={handleOk}>
               OK
             </Button>

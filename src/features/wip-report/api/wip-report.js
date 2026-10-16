@@ -34,7 +34,7 @@ function asDate(value, fallback) {
 function asModels(...lists) {
   const merged = [];
   for (const list of lists) {
-    const arr = Array.isArray(list) ? list : (list ? [list] : []);
+    const arr = Array.isArray(list) ? list : list ? [list] : [];
     for (const v of arr) {
       const s = String(v ?? '').trim();
       if (s && !merged.includes(s)) merged.push(s);
@@ -57,7 +57,7 @@ function summaryBody(params) {
 }
 
 export async function getWipReport(params) {
-  const res = await mesPost(MES_S_CODES.wipReport.summary, summaryBody(params), WIP_SYSTEM);
+  const res = await mesPost(MES_S_CODES.wipReport.getWipSummary, summaryBody(params), WIP_SYSTEM);
   return unwrapList(res);
 }
 
@@ -66,7 +66,50 @@ export async function getWipReport(params) {
  * Gọi song song với getWipReport, cùng bộ param.
  */
 export async function getWipByStation(params) {
-  const res = await mesPost(MES_S_CODES.wipReport.byStation, summaryBody(params), WIP_SYSTEM);
+  const res = await mesPost(MES_S_CODES.wipReport.getWipStation, summaryBody(params), WIP_SYSTEM);
+  return unwrapList(res);
+}
+
+/**
+ * Danh sách serial number đang kẹt (WIP) của MỘT cặp (MO, chuyền).
+ * Gọi khi bấm vào con số cột WIP ở Summary — cùng bộ param summary nhưng
+ * FE khoá P_MOS + P_LINES = đúng MO/chuyền của dòng đã bấm.
+ */
+export async function getWipUnitSnList({ mfgType, mo, line, ...rest } = {}) {
+  const res = await mesPost(
+    MES_S_CODES.wipReport.getWipUnitSn,
+    summaryBody({ ...rest, mfgType, mo, line }),
+    WIP_SYSTEM
+  );
+  return unwrapList(res);
+}
+
+/**
+ * Danh sách đơn vị theo kế hoạch CHƯA NHẬP vào chuyền — cột NotInput ở Summary.
+ * Cùng bộ param summary, FE khoá P_MOS + P_LINES = MO/chuyền đã bấm.
+ *
+ * SFCS sinh serial lúc quét nhập ở trạm đầu, nên các dòng này thường
+ * `sn` = null và `station` = null: FE hiện "Chưa có SN" / "N/A" thay vì "—".
+ */
+export async function getWipNotInputSnList({ mfgType, mo, line, ...rest } = {}) {
+  const res = await mesPost(
+    MES_S_CODES.wipReport.getWipNotInputSn,
+    summaryBody({ ...rest, mfgType, mo, line }),
+    WIP_SYSTEM
+  );
+  return unwrapList(res);
+}
+
+/**
+ * SN đã đạt tại một trạm cụ thể — bấm vào cột trạm ở Summary.
+ * Cùng bộ param summary, thêm P_STATION = mã trạm đã bấm.
+ */
+export async function getWipStationSnList({ mfgType, mo, line, station, ...rest } = {}) {
+  const res = await mesPost(
+    MES_S_CODES.wipReport.getWipStationSn,
+    { ...summaryBody({ ...rest, mfgType, mo, line }), P_STATION: station },
+    WIP_SYSTEM
+  );
   return unwrapList(res);
 }
 
@@ -94,7 +137,7 @@ export async function getModelOptions({ mfgType, line } = {}) {
   const fmt = (d) =>
     `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const res = await mesPost(
-    MES_S_CODES.wipReport.models,
+    MES_S_CODES.wipReport.getWipModels,
     {
       P_MFG_TYPE: mfgType ?? 'SMT',
       P_LINES: asList(line),
@@ -105,8 +148,6 @@ export async function getModelOptions({ mfgType, line } = {}) {
   );
   return unwrapList(res);
 }
-
-
 
 /**
  * Lấy danh sách MO theo MfgType + Line (+ Models nếu có).
@@ -119,7 +160,7 @@ export async function getMoOptions({ mfgType, line, models } = {}) {
   const fmt = (d) =>
     `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const res = await mesPost(
-    MES_S_CODES.wipReport.mos,
+    MES_S_CODES.wipReport.getWipMos,
     {
       P_MFG_TYPE: mfgType ?? 'SMT',
       P_LINES: asList(line),
@@ -189,6 +230,27 @@ export function normalizeWipSummaryRows(rows, mfgType = '') {
 }
 
 /**
+ * Chuẩn hoá rows GET_WIP_UNIT_SN thành dòng bảng "Unit S/N List".
+ * BE đã trả sẵn model + partNumber + lineName + stationName nên FE chỉ
+ * ép kiểu, không suy diễn thêm (thiếu thì '' để UI hiện '—').
+ */
+export function normalizeWipUnitSnRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  const str = (v) => (v === null || v === undefined ? '' : String(v));
+  return rows.map((r, i) => ({
+    seq: i + 1,
+    sn: str(r.sn ?? r.SN),
+    mo: str(r.mo ?? r.MO),
+    model: str(r.model ?? r.MODEL),
+    partNumber: str(r.partNumber ?? r.PART_NUMBER),
+    line: str(r.line ?? r.LINE),
+    lineName: str(r.lineName ?? r.LINE_NAME),
+    station: str(r.station ?? r.STATION),
+    stationName: str(r.stationName ?? r.STATION_NAME),
+  }));
+}
+
+/**
  * Gộp rows GET_WIP_STATION vào các dòng summary theo danh sách trạm FIX CỨNG
  * của công đoạn (`stationList`, từ file wip-station-config.js).
  *
@@ -211,6 +273,10 @@ export function mergeWipStationColumns(summaryRows, stationRows, stationList = n
       key: `st:${s.code}`,
       label: String(s.code),
       title: s.name ?? String(s.code),
+      w: 90,
+      align: 'right',
+      numeric: true,
+      drill: true,
     }));
   } else {
     const seen = new Map();
@@ -227,7 +293,13 @@ export function mergeWipStationColumns(summaryRows, stationRows, stationList = n
     const all = [...seen.values()].sort((a, b) =>
       String(a.seq).localeCompare(String(b.seq), undefined, { numeric: true })
     );
-    stationCols = all.slice(0, MAX_DYNAMIC_COLS);
+    stationCols = all.slice(0, MAX_DYNAMIC_COLS).map((c) => ({
+      ...c,
+      w: 90,
+      align: 'right',
+      numeric: true,
+      drill: true,
+    }));
     extraCount = all.length - stationCols.length;
   }
   const keys = new Set(stationCols.map((c) => c.key));

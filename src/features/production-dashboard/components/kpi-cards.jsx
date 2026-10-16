@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Gauge, Package, PackageCheck, Target, ClipboardList } from 'lucide-react';
+import { Gauge, Package, PackageCheck, Target, ClipboardList, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,9 +46,15 @@ const cardStyles = {
 function LoadingCards() {
   return (
     <div
-      className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5 xl:gap-3"
+      className="relative grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5 xl:gap-3"
       aria-label="Loading production KPIs"
     >
+      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/30 backdrop-blur-[1px]">
+        <span className="flex items-center gap-2 rounded-lg border border-border-strong bg-card/95 px-3.5 py-2 text-xs font-medium text-foreground shadow-sm">
+          <Loader2 className="size-4 animate-spin text-production-blue" />
+          <span>Đang tải số liệu KPI...</span>
+        </span>
+      </div>
       {Array.from({ length: 5 }, (_, index) => (
         <Card
           key={index}
@@ -102,10 +108,16 @@ function MoInfoCard({ selectedWo, copy }) {
               <p className="truncate text-base font-semibold leading-tight text-foreground">
                 {selectedWo.mo}
               </p>
-              <p className="truncate text-xs text-muted-foreground" title={selectedWo.partNumber ?? ''}>
+              <p
+                className="truncate text-xs text-muted-foreground"
+                title={selectedWo.partNumber ?? ''}
+              >
                 {copy.kpi.partNumber}: {selectedWo.partNumber ?? '—'}
               </p>
-              <p className="truncate text-xs text-muted-foreground" title={selectedWo.modelName ?? ''}>
+              <p
+                className="truncate text-xs text-muted-foreground"
+                title={selectedWo.modelName ?? ''}
+              >
                 {copy.kpi.modelName}: {selectedWo.modelName ?? '—'}
               </p>
             </div>
@@ -113,7 +125,9 @@ function MoInfoCard({ selectedWo, copy }) {
             <p className="mt-1.5 text-sm text-muted-foreground">{copy.kpi.noWo}</p>
           )}
         </div>
-        <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', style.icon)}>
+        <div
+          className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', style.icon)}
+        >
           <ClipboardList className="size-5" aria-hidden="true" />
         </div>
       </CardHeader>
@@ -240,7 +254,10 @@ export const KpiCards = memo(function KpiCards({
       title: copy.kpi.output,
       value: formatNumber(summary.totalOutput),
       unit: 'PCS',
-      detail: showWoProgress && woSpan ? woSpan : `${copy.kpi.plan}: ${formatNumber(summary.planOutput)} PCS`,
+      detail:
+        showWoProgress && woSpan
+          ? woSpan
+          : `${copy.kpi.plan}: ${formatNumber(summary.planOutput)} PCS`,
       color: 'green',
     },
     {

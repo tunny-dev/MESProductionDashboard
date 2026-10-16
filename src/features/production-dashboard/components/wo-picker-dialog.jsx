@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-
-import { ChevronLeft, ChevronRight, Search, XIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Search, XIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,7 +27,7 @@ const PAGE_SIZE = 8;
  * Ô WO trên header: readonly, bấm mở dialog chọn từ bảng.
  * Chưa chọn thì hiện placeholder, không cho gõ tay.
  */
-export function WoPickerTrigger({ label, valueLabel, placeholder, disabled, onOpen }) {
+export function WoPickerTrigger({ label, valueLabel, placeholder, disabled, loading, onOpen }) {
   return (
     <div className="grid min-w-0 gap-1">
       <span className="truncate text-[10px] font-medium text-muted-foreground xl:text-[11px]">
@@ -37,7 +36,7 @@ export function WoPickerTrigger({ label, valueLabel, placeholder, disabled, onOp
       <Button
         type="button"
         variant="outline"
-        disabled={disabled}
+        disabled={disabled || loading}
         onClick={onOpen}
         aria-haspopup="dialog"
         className="h-9 w-full min-w-0 justify-start gap-2 border-border-strong bg-[var(--surface)] px-2.5 text-base font-normal text-foreground hover:bg-[var(--surface-hover)] md:text-sm"
@@ -48,9 +47,16 @@ export function WoPickerTrigger({ label, valueLabel, placeholder, disabled, onOp
             !valueLabel && 'font-normal text-muted-foreground'
           )}
         >
-          {valueLabel || placeholder}
+          {loading ? 'Đang tải WO...' : valueLabel || placeholder}
         </span>
-        <Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+        {loading ? (
+          <Loader2
+            aria-hidden="true"
+            className="size-4 shrink-0 animate-spin text-production-blue"
+          />
+        ) : (
+          <Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+        )}
       </Button>
     </div>
   );

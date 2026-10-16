@@ -70,6 +70,7 @@ export function useProductionSnapshot({
     refetchInterval: pollInterval,
     retry: 0,
     placeholderData: keepPreviousData,
+    enabled: Boolean(shiftId),
   });
 
   const view = useMemo(() => (query.data ? buildSnapshotView(query.data) : null), [query.data]);
@@ -87,6 +88,7 @@ export function useLineDetail({ shiftId, lineId, currentMinutes, pollInterval })
     refetchInterval: pollInterval ?? DEFAULT_POLL_INTERVAL_MS,
     retry: 0,
     placeholderData: keepPreviousData,
+    enabled: Boolean(shiftId && lineId),
     select: (snapshot) => {
       const built = buildSnapshotView(snapshot);
       const raw = built.lines.find((l) => l.lineId === lineId);

@@ -1,5 +1,5 @@
 import { memo, useCallback, useId, useMemo, useState } from 'react';
-import { Columns3, LayoutGrid, Rows3 } from 'lucide-react';
+import { Columns3, LayoutGrid, Loader2, Rows3 } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -72,7 +72,11 @@ function ChartMessage({ children, error = false }) {
 
 function ChartLoading() {
   return (
-    <div className="flex h-full min-h-[160px] flex-col justify-end gap-3 px-2 pb-2">
+    <div className="relative flex h-full min-h-[160px] flex-col justify-end gap-3 px-2 pb-2">
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/30 backdrop-blur-[1px]">
+        <Loader2 className="size-6 animate-spin text-production-blue" />
+        <span className="text-xs font-medium text-muted-foreground">Đang tải biểu đồ...</span>
+      </div>
       <div className="flex h-full items-end gap-3">
         {[52, 76, 62, 86, 42, 66].map((height, index) => (
           <Skeleton

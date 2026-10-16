@@ -5,14 +5,16 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { WipQueryTab } from '@/features/wip-report/components/wip-query-tab';
 import { WipSummaryTab } from '@/features/wip-report/components/wip-summary-tab';
+import { WipUnitSnTab } from '@/features/wip-report/components/wip-unit-sn-tab';
 import { WipStationsTab } from '@/features/wip-report/components/wip-stations-tab';
 import { useWipReport, useWipByStation } from '@/features/wip-report/hooks/use-wip-report';
+import { drillFromColumnKey } from '@/features/wip-report/lib/wip-drill';
 
 const TABS = [
-  { value: 'query',        label: 'Query' },
-  { value: 'summary',      label: 'Summary' },
-  { value: 'stations',     label: 'Stations' },
+  { value: 'query', label: 'Query' },
+  { value: 'summary', label: 'Summary' },
   { value: 'unit-sn-list', label: 'Unit S/N List' },
+  { value: 'stations', label: 'Stations' },
 ];
 
 export function WipReportPage() {
@@ -20,15 +22,15 @@ export function WipReportPage() {
   const [queryParams, setQueryParams] = useState(null);
   const [queryKey, setQueryKey] = useState(0); // bump to force re-fetch
   const [reportTime, setReportTime] = useState(null);
+  const [snSelection, setSnSelection] = useState(null);
 
   const enabled = queryParams !== null;
   const { data, isLoading, refetch } = useWipReport({
     params: queryParams,
     enabled,
-    // bump queryKey so re-fetches triggered by countdown also register
     queryKey,
   });
-  // WIP theo trạm — cùng params, gọi song song để pivot cột trạm động.
+
   const { data: stationData } = useWipByStation({
     params: queryParams,
     enabled,
@@ -38,8 +40,27 @@ export function WipReportPage() {
   function handleQuery(params) {
     setQueryParams(params);
     setReportTime(format(new Date(), 'yyyy/MM/dd HH:mm:ss'));
+    setSnSelection(null);
     setActiveTab('summary');
   }
+
+  // Trên WIP khi action: NotInput or cột trạm → chuyển sang tab Unit S/N List.
+  const handleDrill = useCallback((row, columnKey) => {
+    const drillInfo = drillFromColumnKey(columnKey);
+    const mode = drillInfo.mode;
+    const station = drillInfo.station;
+    setSnSelection({
+      mode,
+      station,
+      mo: row.mo,
+      line: row.line,
+      lineName: row.lineName,
+      model: row.model,
+      partNumber: row.partNumber,
+      value: Number(row[columnKey]) || 0,
+    });
+    setActiveTab('unit-sn-list');
+  }, []);
 
   const handleRefetch = useCallback(() => {
     setReportTime(format(new Date(), 'yyyy/MM/dd HH:mm:ss'));
@@ -48,33 +69,34 @@ export function WipReportPage() {
   }, [refetch]);
 
   return (
-    // overflow-x-clip ở root: không có gì trong trang này được phép làm
-    // BODY scroll ngang (thanh scroll thứ 2 ở đáy màn hình).
-    <div className="flex min-w-0 flex-col gap-0 overflow-x-clip">      {/* Page heading */}
+    <div className="flex min-w-0 flex-col gap-0 overflow-x-clip">
       <div className="mb-3 flex shrink-0 items-center gap-1.5">
         <Star className="size-4 text-muted-foreground" aria-hidden />
         <h2 className="text-base font-semibold text-foreground">WIP Report</h2>
       </div>
-
-      {/* ── Tab bar ─────────────────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-border">
         <nav className="flex gap-0" aria-label="WIP Report tabs" role="tablist">
           {TABS.map((tab) => {
             const active = activeTab === tab.value;
+            const locked = tab.value !== 'query' && !enabled;
             return (
               <button
                 key={tab.value}
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-disabled={locked || undefined}
                 aria-controls={`tabpanel-${tab.value}`}
                 id={`tab-${tab.value}`}
+                disabled={locked}
                 onClick={() => setActiveTab(tab.value)}
+                title={locked ? 'Query first to view the report' : undefined}
                 className={cn(
                   'relative px-4 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active
                     ? 'text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-t after:bg-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                  locked && 'cursor-not-allowed opacity-40 hover:text-muted-foreground'
                 )}
               >
                 {tab.label}
@@ -83,12 +105,7 @@ export function WipReportPage() {
           })}
         </nav>
       </div>
-
-      {/* ── Tab panels ──────────────────────────────────────────────────── */}
-      {/* overflow-x-clip: bảng rộng chỉ được scroll BÊN TRONG khung bảng,
-        không cho scroll ngang cả trang làm vỡ layout. */}
       <div className="mt-4 min-w-0 overflow-x-clip">
-        {/* Query */}
         <div
           id="tabpanel-query"
           role="tabpanel"
@@ -100,7 +117,6 @@ export function WipReportPage() {
           </div>
         </div>
 
-        {/* Summary */}
         <div
           id="tabpanel-summary"
           role="tabpanel"
@@ -110,16 +126,32 @@ export function WipReportPage() {
           <WipSummaryTab
             data={data}
             stationData={stationData}
+            onBackToQuery={() => setActiveTab('query')}
             mfgType={queryParams?.mfgType}
             isLoading={isLoading}
             reportTime={reportTime}
             moCreateDateFrom={queryParams?.moCreateDateFrom}
             moCreateDateTo={queryParams?.moCreateDateTo}
             onRefetch={handleRefetch}
+            onDrill={handleDrill}
           />
         </div>
 
-        {/* Stations (fixed config) */}
+        <div
+          id="tabpanel-unit-sn-list"
+          role="tabpanel"
+          aria-labelledby="tab-unit-sn-list"
+          className={activeTab !== 'unit-sn-list' ? 'hidden' : ''}
+        >
+          <WipUnitSnTab
+            key={`${snSelection?.mode ?? ''}|${snSelection?.mo ?? ''}|${snSelection?.line ?? ''}|${snSelection?.station ?? ''}`}
+            selection={snSelection}
+            params={queryParams}
+            queryKey={queryKey}
+            onBackToSummary={() => setActiveTab('summary')}
+          />
+        </div>
+
         <div
           id="tabpanel-stations"
           role="tabpanel"
@@ -127,18 +159,6 @@ export function WipReportPage() {
           className={activeTab !== 'stations' ? 'hidden' : ''}
         >
           <WipStationsTab />
-        </div>
-
-        {/* Unit S/N List */}
-        <div
-          id="tabpanel-unit-sn-list"
-          role="tabpanel"
-          aria-labelledby="tab-unit-sn-list"
-          className={activeTab !== 'unit-sn-list' ? 'hidden' : ''}
-        >
-          <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-border bg-surface">
-            <p className="text-sm text-muted-foreground">Unit S/N List — coming soon</p>
-          </div>
         </div>
       </div>
     </div>

@@ -83,7 +83,11 @@ export const router = createBrowserRouter([
   },
   {
     path: ROUTES.PRODUCTION_DASHBOARD,
-    element: <ProductionDashboardPage />,
+    element: (
+      <RequireAuth>
+        <ProductionDashboardPage />
+      </RequireAuth>
+    ),
     errorElement: <FullscreenRouteErrorPage />,
   },
   {
@@ -101,6 +105,10 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: ROUTES.FORBIDDEN, element: <Forbidden />, errorElement: <RouteErrorPage /> },
+  {
+    path: ROUTES.FORBIDDEN,
+    element: <Forbidden />,
+    errorElement: <RouteErrorPage />,
+  },
   { path: '*', element: <NotFound /> },
 ]);

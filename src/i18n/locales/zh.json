@@ -162,6 +162,7 @@
     "routeFailedTitle": "无法加载此页面",
     "routeFailedDescription": "通常由版本更新或网络不稳定导致。请重新加载页面。",
     "reloadPage": "重新加载页面",
+    "copyErrorCode": "复制错误代码",
     "backToOverview": "返回总览",
     "goBack": "返回上一页",
     "notFound": "404",

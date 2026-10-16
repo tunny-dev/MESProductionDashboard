@@ -72,7 +72,8 @@ export function calculateYield(firstPass, inputQty, actualOutput) {
   const input = Number(inputQty);
   if (!Number.isFinite(input) || input <= 0) return null;
 
-  const good = firstPass === null || firstPass === undefined ? Number(actualOutput) : Number(firstPass);
+  const good =
+    firstPass === null || firstPass === undefined ? Number(actualOutput) : Number(firstPass);
   if (!Number.isFinite(good)) return null;
 
   return Math.min((good / input) * 100, 100);
@@ -169,14 +170,20 @@ export function getStationStatus(
   if (isCurrentShift) {
     const lastAt = parseTaTimestamp(station.lastAt);
     const ref = now ?? new Date();
-    if (lastAt && (ref.getTime() - lastAt.getTime()) / 60000 > STATION_STATUS_THRESHOLD.idleStopMin) {
+    if (
+      lastAt &&
+      (ref.getTime() - lastAt.getTime()) / 60000 > STATION_STATUS_THRESHOLD.idleStopMin
+    ) {
       return 'STOP';
     }
   }
 
   const yieldPct = calculateYield(station.firstPass, input, output);
   const wip = input - output;
-  const wipLimit = Math.max(planOut * STATION_STATUS_THRESHOLD.wipRatio, STATION_STATUS_THRESHOLD.wipMin);
+  const wipLimit = Math.max(
+    planOut * STATION_STATUS_THRESHOLD.wipRatio,
+    STATION_STATUS_THRESHOLD.wipMin
+  );
 
   // Tín hiệu tốc độ:
   // - đang xem ca hiện tại → % đạt của khung vừa kết thúc (phản ánh diễn biến)

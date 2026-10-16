@@ -1,41 +1,51 @@
-import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom';
+import { isRouteErrorResponse, useRouteError } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CircleAlert, RefreshCw, SearchX } from 'lucide-react';
 
 import {
+  ErrorBackButton,
+  ErrorCodeDetail,
   ErrorGhostButton,
   ErrorPrimaryButton,
   ErrorScreen,
 } from '@/components/common/error-screen';
 
+function readErrorCode(error) {
+  if (isRouteErrorResponse(error)) return String(error.status);
+  if (error instanceof Error && error.message) return error.message;
+  return '';
+}
+
+function errorStatus(error) {
+  return isRouteErrorResponse(error) ? error.status : 500;
+}
+
 export function RouteErrorPage() {
   const error = useRouteError();
-  const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const isNotFound = isRouteErrorResponse(error) && error.status === 404;
+  const isNotFound = errorStatus(error) === 404;
 
   return (
     <ErrorScreen
-      icon={isNotFound ? SearchX : CircleAlert}
-      code={isNotFound ? '404' : '500'}
+      code={isNotFound ? '404' : undefined}
       title={isNotFound ? t('error.notFoundTitle') : t('error.routeFailedTitle')}
       message={isNotFound ? t('error.notFoundDescription') : t('error.routeFailedDescription')}
+      detail={isNotFound ? undefined : <ErrorCodeDetail value={readErrorCode(error)} />}
       actions={
-        <>
-          {!isNotFound && (
-            <ErrorGhostButton onClick={() => window.location.reload()}>
-              <RefreshCw aria-hidden className="size-4" />
+        isNotFound ? (
+          <>
+            <ErrorPrimaryButton to="/overview">{t('error.backToOverview')}</ErrorPrimaryButton>
+            <ErrorBackButton />
+          </>
+        ) : (
+          <>
+            <ErrorPrimaryButton onClick={() => window.location.reload()}>
               {t('error.reloadPage')}
-            </ErrorGhostButton>
-          )}
-
-          <ErrorPrimaryButton to="/overview">{t('error.backToOverview')}</ErrorPrimaryButton>
-
-          {!isNotFound && (
-            <ErrorGhostButton onClick={() => navigate(-1)}>{t('error.goBack')}</ErrorGhostButton>
-          )}
-        </>
+            </ErrorPrimaryButton>
+            <ErrorGhostButton to="/overview">{t('error.backToOverview')}</ErrorGhostButton>
+            <ErrorBackButton />
+          </>
+        )
       }
     />
   );
@@ -44,18 +54,31 @@ export function RouteErrorPage() {
 export function FullscreenRouteErrorPage() {
   const error = useRouteError();
   const { t } = useTranslation();
-  const isNotFound = isRouteErrorResponse(error) && error.status === 404;
+
+  const isNotFound = errorStatus(error) === 404;
+  const code = readErrorCode(error);
 
   return (
     <ErrorScreen
-      icon={isNotFound ? SearchX : CircleAlert}
-      code={isNotFound ? '404' : '500'}
+      code={isNotFound ? '404' : undefined}
       title={isNotFound ? t('error.notFoundTitle') : t('error.routeFailedTitle')}
       message={isNotFound ? t('error.notFoundDescription') : t('error.routeFailedDescription')}
+      detail={isNotFound ? undefined : <ErrorCodeDetail value={code} />}
       actions={
-        <ErrorPrimaryButton to="/production-dashboard">
-          {t('error.backToOverview')}
-        </ErrorPrimaryButton>
+        isNotFound ? (
+          <ErrorPrimaryButton to="/production-dashboard">
+            {t('error.backToOverview')}
+          </ErrorPrimaryButton>
+        ) : (
+          <>
+            <ErrorPrimaryButton onClick={() => window.location.reload()}>
+              {t('error.reloadPage')}
+            </ErrorPrimaryButton>
+            <ErrorGhostButton to="/production-dashboard">
+              {t('error.backToOverview')}
+            </ErrorGhostButton>
+          </>
+        )
       }
     />
   );

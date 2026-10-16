@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -106,7 +106,13 @@ export const StationTable = memo(function StationTable({
 }) {
   if (loading && !stations.some((station) => station.actualOutput !== undefined)) {
     return (
-      <Card className="min-h-0 overflow-hidden border border-border-strong bg-card py-0 ring-0">
+      <Card className="relative min-h-[200px] overflow-hidden border border-border-strong bg-card py-0 ring-0">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-background/50 backdrop-blur-[1px]">
+          <Loader2 className="size-8 animate-spin text-production-blue" />
+          <span className="text-xs font-medium text-muted-foreground">
+            {copy.loading || 'Đang tải dữ liệu trạm...'}
+          </span>
+        </div>
         <CardContent className="min-h-0 p-0">
           <div className="flex h-full min-w-0 flex-col overflow-hidden">
             <div className="scrollbar-clean min-h-0 flex-1 overflow-auto [&_[data-slot=table-container]]:h-full">
