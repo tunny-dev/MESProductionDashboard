@@ -35,14 +35,25 @@ const queryKeys = {
 /**
  * Thực thi query WIP Report — chỉ fetch khi `enabled` = true (sau khi bấm Query).
  * `queryKey` (number) có thể tăng dần để bắt buộc re-fetch kể cả khi params không đổi.
+ *
+ * Phân trang SERVER-SIDE: `page` / `pageSize` nằm trong queryKey nên đổi trang
+ * là tự fetch. `placeholderData` giữ data trang cũ trong lúc tải trang mới
+ * (tránh nhấp nháy bảng).
  */
-export function useWipReport({ params, enabled = false, queryKey: bumpKey = 0 }) {
+export function useWipReport({
+  params,
+  page = 1,
+  pageSize = 20,
+  enabled = false,
+  queryKey: bumpKey = 0,
+}) {
   return useQuery({
-    queryKey: [...queryKeys.report(params), bumpKey],
-    queryFn: () => getWipReport(params),
+    queryKey: [...queryKeys.report(params), page, pageSize, bumpKey],
+    queryFn: () => getWipReport(params, { page, pageSize }),
     enabled,
     retry: 0,
     staleTime: 0,
+    placeholderData: (prev) => prev,
   });
 }
 

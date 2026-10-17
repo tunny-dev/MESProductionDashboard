@@ -23,10 +23,15 @@ export function WipReportPage() {
   const [queryKey, setQueryKey] = useState(0); // bump to force re-fetch
   const [reportTime, setReportTime] = useState(null);
   const [snSelection, setSnSelection] = useState(null);
+  // Phân trang server-side của tab Summary (đưa lên đây để nằm trong queryKey).
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const enabled = queryParams !== null;
   const { data, isLoading, refetch } = useWipReport({
     params: queryParams,
+    page,
+    pageSize,
     enabled,
     queryKey,
   });
@@ -39,6 +44,7 @@ export function WipReportPage() {
 
   function handleQuery(params) {
     setQueryParams(params);
+    setPage(1);
     setReportTime(format(new Date(), 'yyyy/MM/dd HH:mm:ss'));
     setSnSelection(null);
     setActiveTab('summary');
@@ -134,6 +140,13 @@ export function WipReportPage() {
             moCreateDateTo={queryParams?.moCreateDateTo}
             onRefetch={handleRefetch}
             onDrill={handleDrill}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
           />
         </div>
 

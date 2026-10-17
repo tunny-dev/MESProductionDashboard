@@ -43,8 +43,8 @@ function asModels(...lists) {
   return merged.length ? merged.join(',') : 'ALL';
 }
 
-function summaryBody(params) {
-  return {
+function summaryBody(params, paging) {
+  const body = {
     P_MFG_TYPE: params.mfgType ?? 'SMT',
     P_LINES: asList(params.line),
     P_MOS: asList(params.mo),
@@ -54,11 +54,71 @@ function summaryBody(params) {
     P_TO: asDate(params.moCreateDateTo, '29991231'),
     P_MAX_DAYS: params.moDays?.toString().trim() ? params.moDays.toString().trim() : 'ALL',
   };
+  // Phân trang server-side CHỈ áp cho getWipSummary (các sCode khác giữ
+  // nguyên bộ param). BE (proc) khai báo P_PAGE/P_PAGE_SIZE nên phải gửi.
+  if (paging) {
+    body.P_PAGE = Math.max(1, Number(paging.page) || 1);
+    body.P_PAGE_SIZE = Math.max(1, Number(paging.pageSize) || 20);
+  }
+  return body;
 }
 
-export async function getWipReport(params) {
-  const res = await mesPost(MES_S_CODES.wipReport.getWipSummary, summaryBody(params), WIP_SYSTEM);
-  return unwrapList(res);
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** Đọc field theo cả camelCase (proc mới) lẫn UPPER (bản legacy). */
+function pick(row, ...keys) {
+  for (const k of keys) {
+    const v = row?.[k];
+    if (v !== undefined && v !== null) return v;
+  }
+  return undefined;
+}
+
+/**
+ * BE lặp `totalRecords` / `page` / `pageSize` trên MỌI dòng (xem proc
+ * GET_WIP_SUMMARY) — đọc ở dòng đầu là đủ. Kèm grand total (SUM() OVER()
+ * của toàn bộ kết quả, không chỉ trang) để footer "Total" vẫn đúng khi
+ * bảng đã phân trang.
+ *
+ * @param {object[]} rows
+ * @param {{ page?: number, pageSize?: number }} requested
+ */
+export function readWipSummaryPaging(rows, requested = {}) {
+  const first = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  return {
+    totalRecords: first ? toNum(pick(first, 'totalRecords', 'TOTALRECORDS')) : 0,
+    page: first ? toNum(pick(first, 'page', 'PAGE')) : Math.max(1, Number(requested.page) || 1),
+    pageSize: first
+      ? toNum(pick(first, 'pageSize', 'PAGESIZE'))
+      : Math.max(1, Number(requested.pageSize) || 20),
+    // null nếu BE chưa trả grand total (FE sẽ fallback cộng trang hiện tại).
+    totals: first
+      ? {
+          moDays: toNum(pick(first, 'totalMoDays', 'TOTALMODAYS')),
+          sapLot: toNum(pick(first, 'totalPlanQty', 'TOTALPLANQTY')),
+          input: toNum(pick(first, 'totalInput', 'TOTALINPUT')),
+          output: toNum(pick(first, 'totalOutput', 'TOTALOUTPUT')),
+          wip: toNum(pick(first, 'totalWip', 'TOTALWIP')),
+          notInput: toNum(pick(first, 'totalNotInput', 'TOTALNOTINPUT')),
+        }
+      : null,
+  };
+}
+
+/**
+ * Trang Summary — phân trang SERVER-SIDE (sCode GET_WIP_SUMMARY).
+ * `paging = { page, pageSize }`; BE trả đúng `pageSize` dòng của trang đó,
+ * mỗi dòng kèm totalRecords/page/pageSize.
+ *
+ * @returns {{ rows: object[], totalRecords: number, page: number, pageSize: number, totals: object|null }}
+ */
+export async function getWipReport(params, paging) {
+  const res = await mesPost(MES_S_CODES.wipReport.getWipSummary, summaryBody(params, paging), WIP_SYSTEM);
+  const rows = unwrapList(res);
+  return { rows, ...readWipSummaryPaging(rows, paging) };
 }
 
 /**

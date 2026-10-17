@@ -68,14 +68,16 @@ export function WipSummaryTab({
   onRefetch,
   onBackToQuery,
   onDrill,
+  page = 1,
+  pageSize = 20,
+  onPageChange,
+  onPageSizeChange,
 }) {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [paused, setPaused] = useState(false);
   const [countdown, setCountdown] = useState(RELOAD_SECONDS);
 
   const { rows, cols, footerKeys, extraStationCount } = useMemo(() => {
-    const summary = normalizeWipSummaryRows(data, mfgType);
+    const summary = normalizeWipSummaryRows(data?.rows ?? data, mfgType);
     const merged = mergeWipStationColumns(summary, stationData, getProcessStations(mfgType));
     const stationCols = merged.stationCols.map((c) => ({
       key: c.key,
@@ -94,9 +96,17 @@ export function WipSummaryTab({
     };
   }, [data, stationData, mfgType]);
 
-  const totalItems = rows.length;
+  // BE đã phân trang: trả ĐÚNG `pageSize` dòng của trang hiện tại.
+  // Tổng số dòng lấy từ `totalRecords`; nếu chưa có (BE cũ) thì dùng độ dài mảng.
+  const serverTotal = Number(data?.totalRecords);
+  const totalItems = Number.isFinite(serverTotal) && serverTotal > 0 ? serverTotal : rows.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const pageRows = rows;
+
+  // Filter đổi làm tổng số trang co lại mà `page` đang vượt → kéo về trang cuối.
+  useEffect(() => {
+    if (totalItems > 0 && page > totalPages) onPageChange?.(totalPages);
+  }, [totalItems, totalPages, page, onPageChange]);
 
   const footerKeyString = footerKeys.join('|');
   const subtotal = useMemo(() => {
@@ -107,14 +117,31 @@ export function WipSummaryTab({
     }
     return out;
   }, [pageRows, footerKeyString]);
+
+  // "Total" = toàn bộ kết quả (mọi trang). Cột trạm cộng từ `stationData`
+  // (không phân trang); cột số cơ bản lấy grand total BE trả kèm (SUM() OVER()),
+  // nếu BE chưa có thì fallback cộng trang hiện tại.
+  const grandTotals = data?.totals ?? null;
   const total = useMemo(() => {
     const keys = footerKeyString.split('|');
+    const stationSums = {};
+    for (const r of stationData ?? []) {
+      const key = `st:${r.station ?? r.STATION}`;
+      if (!keys.includes(key)) continue;
+      stationSums[key] = (stationSums[key] || 0) + (Number(r.outputQty ?? r.OUTPUT_QTY) || 0);
+    }
     const out = {};
     for (const k of keys) {
-      out[k] = rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+      if (k.startsWith('st:')) {
+        out[k] = stationSums[k] ?? 0;
+      } else if (grandTotals && grandTotals[k] !== undefined && grandTotals[k] !== null) {
+        out[k] = Number(grandTotals[k]) || 0;
+      } else {
+        out[k] = pageRows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+      }
     }
     return out;
-  }, [rows, footerKeyString]);
+  }, [footerKeyString, stationData, grandTotals, pageRows]);
 
   const dateRangeLabel = [moCreateDateFrom, moCreateDateTo].filter(Boolean).join(' ~ ');
 
@@ -270,12 +297,12 @@ export function WipSummaryTab({
         <span className="shrink-0 text-muted-foreground">Total {totalItems} items</span>
 
         <div className="flex items-center gap-1">
-          <NavBtn disabled={page === 1} onClick={() => setPage(1)} label="First">
+          <NavBtn disabled={page === 1} onClick={() => onPageChange?.(1)} label="First">
             «
           </NavBtn>
           <NavBtn
             disabled={page === 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => onPageChange?.(Math.max(1, page - 1))}
             label="Prev"
           >
             ‹
@@ -290,7 +317,7 @@ export function WipSummaryTab({
                 key={p}
                 variant={p === page ? 'default' : 'outline'}
                 size="icon-xs"
-                onClick={() => setPage(p)}
+                onClick={() => onPageChange?.(p)}
                 aria-label={`Page ${p}`}
                 aria-current={p === page ? 'page' : undefined}
               >
@@ -300,12 +327,16 @@ export function WipSummaryTab({
           )}
           <NavBtn
             disabled={page === totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => onPageChange?.(Math.min(totalPages, page + 1))}
             label="Next"
           >
             ›
           </NavBtn>
-          <NavBtn disabled={page === totalPages} onClick={() => setPage(totalPages)} label="Last">
+          <NavBtn
+            disabled={page === totalPages}
+            onClick={() => onPageChange?.(totalPages)}
+            label="Last"
+          >
             »
           </NavBtn>
         </div>
@@ -313,10 +344,7 @@ export function WipSummaryTab({
         <div className="ml-auto flex items-center gap-2">
           <select
             value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setPage(1);
-            }}
+            onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
             className="h-6 rounded border border-input bg-transparent px-1 text-xs outline-none"
           >
             {PAGE_SIZE_OPTIONS.map((s) => (
