@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
 
-import { MES_S_CODES } from '@/config/api';
+import { ENDPOINTS } from '@/config/api';
 import {
   getMoSummaryPart,
   getWipReportPart,
@@ -258,53 +258,36 @@ export function useDashboardData({
 }
 
 function argsFor(key, args) {
-  if (key === 'chartOutput' || key === 'chartUph')
-    return {
-      SDATE: args.dateStr,
-      MO: args.mo,
-      LINE: args.lineId,
-      DEPT: args.dept,
-      SHIFT: args.shift,
-      MODEL: args.model,
-      SCOPE: args.scope,
-    };
-  if (key === 'moSummary')
-    return {
-      MO: args.mo,
-      SDATE: args.dateStr,
-      LINE: args.lineId,
-      DEPT: args.dept,
-      SHIFT: args.shift,
-      SCOPE: args.scope,
-    };
-  if (key === 'wipReport')
-    return {
-      SDATE: args.dateStr,
-      MO: args.mo,
-      LINE: args.lineId,
-      DEPT: args.dept,
-      SHIFT: args.shift,
-      MODEL: args.model,
-      SCOPE: args.scope,
-    };
-  if (key === 'flow')
-    return {
-      MO: args.mo,
-      SDATE: args.dateStr,
-      EDATE: args.dateStr,
-      DEPT: args.dept,
-      LINE: args.lineId,
-      SHIFT: args.shift,
-    };
-  return { DEPT: args.dept, LINE: args.lineId, SDATE: args.dateStr, SHIFT: args.shift };
+  const base = {
+    sDate: args.dateStr,
+    mo: args.mo,
+    line: args.lineId,
+    dept: args.dept,
+    shift: args.shift,
+  };
+  const withModel = { ...base, model: args.model };
+  const scope = args.scope === 'WO' ? { scope: 'WO' } : {};
+
+  switch (key) {
+    case 'chartOutput':
+    case 'chartUph':
+    case 'wipReport':
+      return { ...withModel, ...scope };
+    case 'moSummary':
+      return { ...base, ...scope };
+    case 'flow':
+      return base;
+    default:
+      return base;
+  }
 }
 
-const PART_S_CODES = () => ({
-  moSummary: MES_S_CODES.production.getMoSummary,
-  wipReport: MES_S_CODES.production.getWipReport,
-  hourly: MES_S_CODES.production.getProductionAchievement,
-  uphTrend: MES_S_CODES.production.getUphTrend,
-  flow: MES_S_CODES.production.getFlowByMo,
+const PART_ENDPOINTS = () => ({
+  moSummary: ENDPOINTS.production.moSummary,
+  wipReport: ENDPOINTS.production.wipReport,
+  hourly: ENDPOINTS.production.achievement,
+  uphTrend: ENDPOINTS.production.uphTrend,
+  flow: ENDPOINTS.production.flowByMo,
 });
 
 function toPartView(key, label, query, getArgs) {
@@ -322,7 +305,7 @@ function toPartView(key, label, query, getArgs) {
   return {
     key,
     label,
-    sCode: payload?.sCode ?? PART_S_CODES()[key],
+    endpoint: payload?.endpoint ?? PART_ENDPOINTS()[key],
     params,
     status,
     isFetching: query.isFetching,

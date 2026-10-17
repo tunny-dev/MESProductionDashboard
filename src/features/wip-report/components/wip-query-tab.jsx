@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { CalendarIcon, ChevronDown, X, Check } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -20,13 +20,28 @@ import {
   useWipModelOptions,
   useWipMoOptions,
 } from '@/features/wip-report/hooks/use-wip-report';
+import { SimplePagination } from '@/features/wip-report/components/simple-pagination';
 
 const MFG_TYPES = ['SMT', 'DIP', 'FA'];
 
-const EMPTY_FORM = {
+// Số lựa chọn mỗi trang trong dialog multi-select (Model / Line / MO).
+const DIALOG_PAGE_SIZE = 20;
+
+// Khoảng MO Create Date tối đa cho phép query: 1 tháng (31 ngày, tính bao gồm).
+const MAX_RANGE_DAYS = 31;
+
+// Mốc hôm nay (00:00) — dùng để chặn chọn ngày tương lai.
+const TODAY_START = (() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+})();
+
+// Mặc định điền sẵn khoảng 1 tháng gần nhất.
+const DEFAULT_FORM = {
   mfgType: 'SMT',
-  moCreateDateFrom: null,
-  moCreateDateTo: null,
+  moCreateDateFrom: subDays(TODAY_START, MAX_RANGE_DAYS - 1),
+  moCreateDateTo: TODAY_START,
   moDays: '',
   models: [], // multi-select array (part code)
   lines: [], // multi-select array
@@ -34,7 +49,7 @@ const EMPTY_FORM = {
 };
 
 export function WipQueryTab({ onQuery }) {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(DEFAULT_FORM);
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
 
@@ -58,10 +73,19 @@ export function WipQueryTab({ onQuery }) {
   }
 
   function handleClear() {
-    setForm(EMPTY_FORM);
+    setForm(DEFAULT_FORM);
   }
 
-  const canQuery = Boolean(form.moCreateDateFrom && form.moCreateDateTo);
+  const canPickDates = Boolean(form.moCreateDateFrom && form.moCreateDateTo);
+
+  // Số ngày bao gồm của khoảng đã chọn (chỉ có ý nghĩa khi đã chọn đủ 2 đầu).
+  const rangeDays = canPickDates
+    ? differenceInCalendarDays(form.moCreateDateTo, form.moCreateDateFrom) + 1
+    : 0;
+  const rangeTooLong = rangeDays > MAX_RANGE_DAYS;
+  const rangeReversed = canPickDates && rangeDays <= 0;
+
+  const canQuery = canPickDates && !rangeTooLong && !rangeReversed;
 
   function handleQuery() {
     if (!canQuery) return;
@@ -80,7 +104,7 @@ export function WipQueryTab({ onQuery }) {
   return (
     <div className="w-full max-w-2xl">
       <FormRow label="MFG Type" required>
-        <div className="flex flex-wrap gap-4">
+        <div className="flex min-h-8 flex-wrap items-center gap-4">
           {MFG_TYPES.map((type) => (
             <label key={type} className="flex cursor-pointer items-center gap-1.5 text-sm">
               <input
@@ -121,6 +145,7 @@ export function WipQueryTab({ onQuery }) {
           <span className="rounded bg-warning-bg px-2 py-0.5 text-xs text-warning-text">
             Format: yyyy/mm/dd
           </span>
+          <span className="text-xs text-muted-foreground">Max range: {MAX_RANGE_DAYS} days</span>
         </div>
       </FormRow>
 
@@ -138,6 +163,8 @@ export function WipQueryTab({ onQuery }) {
       <FormRow label="Model">
         <MultiSelectDialog
           title="Select Models"
+          columnLabel="Model"
+          numbered
           options={modelOptions}
           getLabel={(o) => {
             const name = o.name ?? o.NAME ?? '';
@@ -153,6 +180,8 @@ export function WipQueryTab({ onQuery }) {
       <FormRow label="Line">
         <MultiSelectDialog
           title="Select Lines"
+          columnLabel="Line"
+          numbered
           options={lineOptions}
           getLabel={(o) => {
             const id = o.lineId ?? o.LINE ?? o.line ?? '';
@@ -168,6 +197,21 @@ export function WipQueryTab({ onQuery }) {
       <FormRow label="MO">
         <MultiSelectDialog
           title="Select MOs"
+          columnLabel="MO"
+          columns={[
+            {
+              key: 'stt',
+              label: 'STT',
+              className: 'w-12 text-right tabular-nums text-muted-foreground',
+            },
+            { key: 'mo', label: 'MO' },
+            { key: 'createDate', label: 'Created Date', className: 'w-28 whitespace-nowrap' },
+          ]}
+          getRow={(o, i) => ({
+            stt: i + 1,
+            mo: o.mo ?? o.MO ?? '',
+            createDate: formatCellDate(o.createDate ?? o.CREATE_DATE),
+          })}
           options={moOptions}
           getLabel={(o) => o.mo ?? o.MO ?? String(o)}
           getValue={(o) => o.mo ?? o.MO ?? String(o)}
@@ -189,9 +233,15 @@ export function WipQueryTab({ onQuery }) {
         >
           Query
         </Button>
-        {!canQuery ? (
+        {!canPickDates ? (
           <span className="text-xs text-muted-foreground">
             Select MO Create Date to enable Query
+          </span>
+        ) : rangeReversed ? (
+          <span className="text-xs text-error">End date must be on or after start date</span>
+        ) : rangeTooLong ? (
+          <span className="text-xs text-error">
+            Date range must be within {MAX_RANGE_DAYS} days
           </span>
         ) : null}
       </div>
@@ -211,11 +261,11 @@ function FormRow({ label, required, children }) {
   );
 }
 
-const TODAY_START = (() => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-})();
+function formatCellDate(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : format(d, 'yyyy/MM/dd');
+}
 
 function DateButton({ value, open, onOpenChange, onSelect }) {
   return (
@@ -247,14 +297,44 @@ function DateButton({ value, open, onOpenChange, onSelect }) {
   );
 }
 
-function MultiSelectDialog({ title, options, getLabel, getValue, selected, onChange }) {
+function MultiSelectDialog({
+  title,
+  columnLabel,
+  columns,
+  numbered = false,
+  getRow,
+  options,
+  getLabel,
+  getValue,
+  selected,
+  onChange,
+}) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [draft, setDraft] = useState(selected);
+
+  // Dialog nào truyền `columns` thì dùng đúng cột đó (MO: STT · MO · Created
+  // Date). Còn lại: có `numbered` thì thêm cột STT đứng trước, không thì chỉ 1
+  // cột với tiêu đề `columnLabel` (Model / Line).
+  const tableColumns =
+    columns && columns.length > 0
+      ? columns
+      : numbered
+        ? [
+            {
+              key: '__stt',
+              label: 'STT',
+              className: 'w-12 text-right tabular-nums text-muted-foreground',
+            },
+            { key: '__value', label: columnLabel ?? '' },
+          ]
+        : [{ key: '__value', label: columnLabel ?? '' }];
 
   function handleOpen() {
     setDraft(selected);
     setSearch('');
+    setPage(1);
     setOpen(true);
   }
 
@@ -273,7 +353,12 @@ function MultiSelectDialog({ title, options, getLabel, getValue, selected, onCha
 
   const filtered = options.filter((o) => getLabel(o).toLowerCase().includes(search.toLowerCase()));
 
-  const displayOptions = filtered.length > 0 ? filtered : [];
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DIALOG_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = filtered.slice(
+    (currentPage - 1) * DIALOG_PAGE_SIZE,
+    currentPage * DIALOG_PAGE_SIZE
+  );
 
   return (
     <div className="min-w-0 flex-1">
@@ -320,54 +405,104 @@ function MultiSelectDialog({ title, options, getLabel, getValue, selected, onCha
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         </Button>
 
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
 
-          {/* Search */}
           <Input
             className="h-8"
             placeholder="Search…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             autoFocus
           />
 
-          <div className="max-h-64 overflow-y-auto rounded border border-border">
-            {displayOptions.length === 0 ? (
-              <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                No options available
-              </p>
-            ) : (
-              displayOptions.map((o, i) => {
-                const val = getValue(o);
-                const checked = draft.includes(val);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => toggle(val)}
-                    className={cn(
-                      'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-surface-hover',
-                      checked && 'bg-primary/5'
-                    )}
-                  >
-                    <span
+          <div className="max-h-96 overflow-y-auto rounded border border-border">
+            <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+              <thead className="sticky top-0 z-10 bg-muted">
+                <tr>
+                  <th className="w-9 border-b border-border px-3 py-2" aria-hidden="true" />
+                  {tableColumns.map((col) => (
+                    <th
+                      key={col.key}
                       className={cn(
-                        'flex size-4 shrink-0 items-center justify-center rounded border',
-                        checked
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-input'
+                        'border-b border-border px-2 py-2 text-left text-xs font-medium text-muted-foreground',
+                        col.className
                       )}
                     >
-                      {checked && <Check className="size-3" />}
-                    </span>
-                    <span className="truncate">{getLabel(o)}</span>
-                  </button>
-                );
-              })
-            )}
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={tableColumns.length + 1}
+                      className="px-3 py-6 text-center text-xs text-muted-foreground"
+                    >
+                      No options available
+                    </td>
+                  </tr>
+                ) : (
+                  pageItems.map((o, i) => {
+                    const rowIndex = (currentPage - 1) * DIALOG_PAGE_SIZE + i;
+                    const val = getValue(o);
+                    const checked = draft.includes(val);
+                    const cells = getRow
+                      ? getRow(o, rowIndex)
+                      : numbered
+                        ? { __stt: rowIndex + 1, __value: getLabel(o) }
+                        : { __value: getLabel(o) };
+                    return (
+                      <tr
+                        key={i}
+                        tabIndex={0}
+                        onClick={() => toggle(val)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggle(val);
+                          }
+                        }}
+                        className={cn(
+                          'cursor-pointer outline-none transition-colors hover:bg-surface-hover',
+                          checked && 'bg-primary/5'
+                        )}
+                      >
+                        <td className="px-3 py-2">
+                          <span
+                            className={cn(
+                              'flex size-4 items-center justify-center rounded border',
+                              checked
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-input'
+                            )}
+                          >
+                            {checked && <Check className="size-3" />}
+                          </span>
+                        </td>
+                        {tableColumns.map((col) => (
+                          <td key={col.key} className={cn('truncate px-2 py-2', col.className)}>
+                            {cells[col.key]}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>Total {filtered.length} items</span>
+            <SimplePagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
           </div>
 
           <DialogFooter>

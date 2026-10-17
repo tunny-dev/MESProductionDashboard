@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Star } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -23,10 +23,19 @@ export function WipReportPage() {
   const [queryKey, setQueryKey] = useState(0); // bump to force re-fetch
   const [reportTime, setReportTime] = useState(null);
   const [snSelection, setSnSelection] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const enabled = queryParams !== null;
-  const { data, isLoading, refetch } = useWipReport({
-    params: queryParams,
+
+  // Phân trang phía server: gộp page/pageSize vào params của query summary.
+  const listParams = useMemo(
+    () => (queryParams ? { ...queryParams, page, pageSize } : null),
+    [queryParams, page, pageSize]
+  );
+
+  const { data, isLoading, isFetching } = useWipReport({
+    params: listParams,
     enabled,
     queryKey,
   });
@@ -39,9 +48,15 @@ export function WipReportPage() {
 
   function handleQuery(params) {
     setQueryParams(params);
+    setPage(1);
     setReportTime(format(new Date(), 'yyyy/MM/dd HH:mm:ss'));
     setSnSelection(null);
     setActiveTab('summary');
+  }
+
+  function handlePageSizeChange(size) {
+    setPageSize(size);
+    setPage(1);
   }
 
   // Trên WIP khi action: NotInput or cột trạm → chuyển sang tab Unit S/N List.
@@ -64,9 +79,10 @@ export function WipReportPage() {
 
   const handleRefetch = useCallback(() => {
     setReportTime(format(new Date(), 'yyyy/MM/dd HH:mm:ss'));
+    // Tăng queryKey để đổi key → React Query tự fetch lại (cả report lẫn by-station).
+    // Không gọi thêm refetch() nữa để tránh gọi trùng 2 request.
     setQueryKey((k) => k + 1);
-    refetch();
-  }, [refetch]);
+  }, []);
 
   return (
     <div className="flex min-w-0 flex-col gap-0 overflow-x-clip">
@@ -129,9 +145,16 @@ export function WipReportPage() {
             onBackToQuery={() => setActiveTab('query')}
             mfgType={queryParams?.mfgType}
             isLoading={isLoading}
+            isFetching={isFetching}
             reportTime={reportTime}
             moCreateDateFrom={queryParams?.moCreateDateFrom}
             moCreateDateTo={queryParams?.moCreateDateTo}
+            page={page}
+            pageSize={pageSize}
+            totalItems={data?.total ?? 0}
+            totalPages={data?.totalPages ?? 1}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
             onRefetch={handleRefetch}
             onDrill={handleDrill}
           />

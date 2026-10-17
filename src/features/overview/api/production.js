@@ -1,47 +1,38 @@
-import { MES_S_CODES } from '@/config/api';
-import { mesPost } from '@/lib/mes-http';
-import { unwrapList } from '@/lib/unwrap-response';
+import { http } from '@/lib/http';
+import { ENDPOINTS } from '@/config/api';
 
-const PRODUCTION_SYSTEM = 'sfcs';
+/**
+ * API cho trang Tổng quan.
+ */
 
 export function currentMinutesOfDay(date = new Date()) {
   return date.getHours() * 60 + date.getMinutes();
 }
 
 export async function getAreas() {
-  return unwrapList(
-    await mesPost(MES_S_CODES.production.getProductionAreaList, {}, PRODUCTION_SYSTEM)
-  );
+  const data = await http.get(ENDPOINTS.cim.productionAreaList);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getShifts() {
-  return unwrapList(
-    await mesPost(MES_S_CODES.production.getProductionShiftList, {}, PRODUCTION_SYSTEM)
-  );
+  const data = await http.get(ENDPOINTS.cim.productionShiftList);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getStopReasons() {
-  return unwrapList(
-    await mesPost(MES_S_CODES.production.getProductionStopReasonList, {}, PRODUCTION_SYSTEM)
-  );
+  const data = await http.get(ENDPOINTS.cim.productionStopReasonList);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function getShiftSnapshot({ shiftId, currentMinutes = currentMinutesOfDay() }) {
-  return unwrapList(
-    await mesPost(
-      MES_S_CODES.production.getProductionSnapshot,
-      { P_SHIFT_ID: shiftId, P_CURRENT_MINUTES: currentMinutes },
-      PRODUCTION_SYSTEM
-    )
-  );
+  return http.get(ENDPOINTS.production.snapshot, {
+    params: { shiftId, currentMinutes },
+  });
 }
 
 export async function getLineDetail({ shiftId, lineId, currentMinutes = currentMinutesOfDay() }) {
-  return unwrapList(
-    await mesPost(
-      MES_S_CODES.production.getProductionLineDetail,
-      { P_SHIFT_ID: shiftId, P_LINE_ID: lineId, P_CURRENT_MINUTES: currentMinutes },
-      PRODUCTION_SYSTEM
-    )
-  );
+  const data = await http.get(ENDPOINTS.production.lineDetail, {
+    params: { shiftId, lineId, currentMinutes },
+  });
+  return Array.isArray(data) ? data : [];
 }

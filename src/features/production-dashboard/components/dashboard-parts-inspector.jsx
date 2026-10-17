@@ -1,6 +1,6 @@
 /**
  * Màn debug (?debug=1): soi request/response thô của từng nguồn dashboard.
- * Chỉ dùng khi rà soát sCode — không hiện ở màn thường.
+ * Chỉ dùng khi rà soát endpoint/params — không hiện ở màn thường.
  */
 
 const STATUS_STYLE = {
@@ -40,7 +40,7 @@ export function DashboardPartsInspector({ parts = [] }) {
                 {part.isFetching ? '…' : ''}
               </span>
               <span className="font-semibold">{part.label}</span>
-              <code className="text-xs text-muted-foreground">{part.sCode}</code>
+              <code className="text-xs text-muted-foreground">{part.endpoint}</code>
               <span className="ml-auto text-xs text-muted-foreground tabular-nums">
                 {part.rowCount} rows · {part.columns.length} cols
               </span>

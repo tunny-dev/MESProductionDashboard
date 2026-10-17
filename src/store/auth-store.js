@@ -1,25 +1,45 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/**
+ * @typedef {Object} AuthSession
+ * @property {string} token        Access token (JWT).
+ * @property {string|null} refreshToken Refresh token (dùng để làm mới phiên).
+ * @property {string|null} expiresAt    Thời điểm access token hết hạn (ISO).
+ * @property {{ id: string, name: string, email?: string|null, type?: string|null }} user
+ */
+
 export const useAuthStore = create()(
   persist(
     (set) => ({
       token: null,
+      refreshToken: null,
+      expiresAt: null,
       user: null,
 
-      /** @param {{ token: string, user: { id: string, name: string } }} session */
-      login: (session) => set({ token: session.token, user: session.user }),
+      /** @param {AuthSession} session */
+      login: (session) =>
+        set({
+          token: session.token,
+          refreshToken: session.refreshToken ?? null,
+          expiresAt: session.expiresAt ?? null,
+          user: session.user,
+        }),
 
-      logout: () => set({ token: null, user: null }),
+      logout: () => set({ token: null, refreshToken: null, expiresAt: null, user: null }),
     }),
     {
       name: 'sfcs-auth',
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      partialize: (state) => ({
+        token: state.token,
+        refreshToken: state.refreshToken,
+        expiresAt: state.expiresAt,
+        user: state.user,
+      }),
     }
   )
 );
 
-/** Đọc nhanh không cần hook — dùng trong http client và guard. */
 export function isAuthenticated() {
   return Boolean(useAuthStore.getState().token);
 }

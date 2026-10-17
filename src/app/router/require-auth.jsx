@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 import { useAuthStore } from '@/store/auth-store';
 import { canAccessOverview } from '@/config/app';
-import { ROUTES } from './routes';
+import { ROUTES } from '@/app/router/routes.js';
 
 export function RequireAuth({ children }) {
   const token = useAuthStore((state) => state.token);

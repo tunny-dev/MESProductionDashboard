@@ -61,9 +61,9 @@ export const FlowStrip = memo(function FlowStrip({
               qty !== null && qty !== undefined && Number.isFinite(Number(qty))
                 ? `${copy.flow.qty} ${formatNumber(qty)}`
                 : null;
-            // Thẻ nào đang đỏ (vượt ngưỡng WIP, hoặc là bottleneck) thì nhấp
-            // nháy: trên TV người ta không đọc chữ, chỉ nhận ra vùng đang nhấp
-            // nháy. Lớp phủ đặt sau chữ (z âm) nên chữ không bị nhòe theo nhịp.
+            // Thẻ nào đang đỏ (vượt ngưỡng WIP, hoặc là bottleneck) thì tô nền
+            // đỏ đặc + chữ trắng và phát sáng nhấp nháy: trên TV người ta không
+            // đọc chữ, chỉ nhận ra vùng đang nổi bật.
             const isAlert = isWipOver || isBottleneck;
 
             // Tooltip gom hết thông tin của thẻ vào một chỗ: tên công đoạn,
@@ -93,33 +93,45 @@ export const FlowStrip = memo(function FlowStrip({
                     render={
                       <div
                         className={cn(
-                          'relative isolate flex h-20 w-full min-w-0 flex-col items-center justify-center rounded-lg border border-border-strong/80 bg-[var(--surface)] px-1.5 py-1 text-center transition-colors',
-                          isBottleneck &&
-                            'border-danger/70 bg-danger/10 shadow-[0_0_8px_var(--danger-bg)]',
-                          isWipOver && 'border-danger/80 bg-danger/20'
+                          'relative isolate flex h-20 w-full min-w-0 flex-col items-center justify-center rounded-lg border px-1.5 py-1 text-center transition-colors',
+                          isAlert
+                            ? 'border-danger bg-danger font-semibold text-white alert-pulse'
+                            : 'border-border-strong/80 bg-[var(--surface)]'
                         )}
                       />
                     }
                   >
-                    {isAlert ? (
-                      <span
-                        aria-hidden="true"
-                        className="-z-10 pointer-events-none absolute inset-0 rounded-lg bg-danger/20 alert-blink"
-                      />
-                    ) : null}
-                    <span className="max-w-full truncate text-[10px] font-semibold leading-tight text-foreground 2xl:text-xs">
+                    <span
+                      className={cn(
+                        'max-w-full truncate text-[10px] font-semibold leading-tight 2xl:text-xs',
+                        isAlert ? 'text-white' : 'text-foreground'
+                      )}
+                    >
                       {stationConfig.id}
                     </span>
-                    <span className="mt-0.5 max-w-full truncate text-[10px] leading-tight text-muted-foreground 2xl:text-[11px]">
+                    <span
+                      className={cn(
+                        'mt-0.5 max-w-full truncate text-[10px] leading-tight 2xl:text-[11px]',
+                        isAlert ? 'text-white/85' : 'text-muted-foreground'
+                      )}
+                    >
                       {stationConfig.shortName}
                       {qtyText ? ` · ${qtyText}` : ''}
                     </span>
                     <div className="mt-1.5 flex min-w-0 items-center justify-center gap-1.5">
                       <span
-                        className={cn('size-2 shrink-0 rounded-full', tone.dot)}
+                        className={cn(
+                          'size-2 shrink-0 rounded-full',
+                          isAlert ? 'bg-white' : tone.dot
+                        )}
                         aria-hidden="true"
                       />
-                      <span className="truncate text-[10px] font-semibold tabular-nums text-foreground 2xl:text-xs">
+                      <span
+                        className={cn(
+                          'truncate text-[10px] font-semibold tabular-nums 2xl:text-xs',
+                          isAlert ? 'text-white' : 'text-foreground'
+                        )}
+                      >
                         {formatNumber(station.actualUph)}
                       </span>
                       <span className="sr-only">{statusLabel(status, copy)}</span>

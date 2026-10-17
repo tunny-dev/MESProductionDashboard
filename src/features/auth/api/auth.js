@@ -1,35 +1,52 @@
 import { ENDPOINTS } from '@/config/api';
 import { http } from '@/lib/http';
 
-function normalizeMesSession(data, username) {
-  const candidates = [data, data?.data, data?.result, data?.data?.data];
-  const session = candidates.find((c) => {
-    const t = c?.token ?? c?.accessToken ?? c?.access_token ?? c?.jwt;
-    return typeof t === 'string' && t.trim().length > 0;
-  });
+/**
+ * API: `POST /api/common/auth/login` → envelope `{ success, data }` với
+ * `data = { accessToken, refreshToken, expiresAt, userId, username, email, type }`.
+ * `http` đã bóc sẵn envelope nên `data` ở đây là `AuthResponse` trực tiếp.
+ * @param {any} data
+ * @param {string} [fallbackUsername]
+ * @returns {{ token: string, refreshToken: string|null, expiresAt: string|null,
+ *            user: { id: string, name: string, email: string|null, type: string|null } }}
+ */
+function toSession(data, fallbackUsername) {
+  const token = data?.accessToken;
 
-  const token = session?.token ?? session?.accessToken ?? session?.access_token ?? session?.jwt;
-
-  if (!token) {
-    const error = new Error('MES response did not include a session token');
+  if (typeof token !== 'string' || token.trim() === '') {
+    const error = new Error('API đăng nhập không trả về access token');
     error.status = 502;
     throw error;
   }
 
-  const remoteUser =
-    session?.user ?? session?.profile ?? session?.account ?? data?.user ?? data?.data?.user;
-  const id = remoteUser?.id ?? remoteUser?.userId ?? remoteUser?.username ?? username;
-  const name = remoteUser?.name ?? remoteUser?.fullName ?? remoteUser?.displayName ?? id;
+  const id = data?.userId ?? data?.username ?? fallbackUsername;
 
   return {
     token,
-    user: { id: String(id), name: String(name) },
+    refreshToken: data?.refreshToken ?? null,
+    expiresAt: data?.expiresAt ?? null,
+    user: {
+      id: String(id ?? ''),
+      name: String(data?.username ?? id ?? ''),
+      email: data?.email ?? null,
+      type: data?.type ?? null,
+    },
   };
 }
 
 export async function login({ username, password }) {
-  const data = await http.post(ENDPOINTS.mes.auth, { username, password, company: '' });
-  return normalizeMesSession(data, username);
+  const data = await http.post(ENDPOINTS.auth.login, { username, password });
+  return toSession(data, username);
+}
+
+export async function refreshSession(refreshToken) {
+  const data = await http.post(ENDPOINTS.auth.refresh, { refreshToken });
+  return toSession(data);
+}
+
+export async function logout(refreshToken) {
+  if (!refreshToken) return;
+  await http.post(ENDPOINTS.auth.logout, { refreshToken });
 }
 
 export async function fetchMe() {

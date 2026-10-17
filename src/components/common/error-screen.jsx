@@ -105,7 +105,7 @@ export function ErrorCodeDetail({ value }) {
       await navigator.clipboard.writeText(value);
       setCopied(true);
     } catch (e) {
-      console.log(e);
+      console.error(e);
     }
   }
 

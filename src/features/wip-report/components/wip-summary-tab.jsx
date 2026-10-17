@@ -62,20 +62,26 @@ export function WipSummaryTab({
   stationData,
   mfgType,
   isLoading,
+  isFetching = false,
   reportTime,
   moCreateDateFrom,
   moCreateDateTo,
+  page = 1,
+  pageSize = 20,
+  totalItems = 0,
+  totalPages = 1,
+  onPageChange,
+  onPageSizeChange,
   onRefetch,
   onBackToQuery,
   onDrill,
 }) {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [paused, setPaused] = useState(false);
   const [countdown, setCountdown] = useState(RELOAD_SECONDS);
 
   const { rows, cols, footerKeys, extraStationCount } = useMemo(() => {
-    const summary = normalizeWipSummaryRows(data, mfgType);
+    // Phân trang phía server: `data.items` chỉ chứa dòng của trang hiện tại.
+    const summary = normalizeWipSummaryRows(data?.items, mfgType);
     const merged = mergeWipStationColumns(summary, stationData, getProcessStations(mfgType));
     const stationCols = merged.stationCols.map((c) => ({
       key: c.key,
@@ -94,9 +100,8 @@ export function WipSummaryTab({
     };
   }, [data, stationData, mfgType]);
 
-  const totalItems = rows.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  // Phân trang do server quản lý: `rows` đã là đúng trang hiện tại.
+  const pageRows = rows;
 
   const footerKeyString = footerKeys.join('|');
   const subtotal = useMemo(() => {
@@ -107,14 +112,6 @@ export function WipSummaryTab({
     }
     return out;
   }, [pageRows, footerKeyString]);
-  const total = useMemo(() => {
-    const keys = footerKeyString.split('|');
-    const out = {};
-    for (const k of keys) {
-      out[k] = rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
-    }
-    return out;
-  }, [rows, footerKeyString]);
 
   const dateRangeLabel = [moCreateDateFrom, moCreateDateTo].filter(Boolean).join(' ~ ');
 
@@ -198,67 +195,73 @@ export function WipSummaryTab({
         </div>
       </div>
 
-      <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-border [scrollbar-gutter:stable]">
-        <table
-          style={{
-            width: 'max-content',
-            minWidth: '100%',
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-          }}
-          className="text-xs [&_td]:border-b [&_td]:border-r [&_td]:border-border [&_th]:border-b [&_th]:border-r [&_th]:border-border"
-        >
-          <caption className="sr-only">WIP Report Summary</caption>
+      <div className="relative grid min-w-0 max-w-full rounded-lg border border-border">
+        <div className="col-start-1 row-start-1 overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]">
+          <table
+            style={{
+              width: 'max-content',
+              minWidth: '100%',
+              borderCollapse: 'separate',
+              borderSpacing: 0,
+            }}
+            className="text-xs [&_td]:border-b [&_td]:border-r [&_td]:border-border [&_th]:border-b [&_th]:border-r [&_th]:border-border"
+          >
+            <caption className="sr-only">WIP Report Summary</caption>
 
-          <thead>
-            <tr style={{ backgroundColor: 'var(--color-muted, #f0f3f5)' }}>
-              {cols.map((col) => {
-                const align =
-                  col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left';
-                return (
-                  <th
-                    key={col.key}
-                    title={col.title ?? col.label}
-                    style={{
-                      ...headerStickyStyle(col),
-                      textAlign: align,
-                      backgroundColor: 'var(--color-muted, #f0f3f5)',
-                    }}
-                    className={cn(
-                      'px-1.5 py-2 font-medium text-foreground leading-tight',
-                      col.sticky ? 'whitespace-nowrap' : 'whitespace-normal'
-                    )}
-                  >
-                    {col.label}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--color-muted, #f0f3f5)' }}>
+                {cols.map((col) => {
+                  const align =
+                    col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left';
+                  return (
+                    <th
+                      key={col.key}
+                      title={col.title ?? col.label}
+                      style={{
+                        ...headerStickyStyle(col),
+                        textAlign: align,
+                        backgroundColor: 'var(--color-muted, #f0f3f5)',
+                      }}
+                      className={cn(
+                        'px-1.5 py-2 font-medium text-foreground leading-tight',
+                        col.sticky ? 'whitespace-nowrap' : 'whitespace-normal'
+                      )}
+                    >
+                      {col.label}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
 
-          <tbody>
-            {pageRows.map((row, ri) => (
-              <BodyRow
-                key={`${row.mo}|${row.line}|${ri}`}
-                row={row}
+            <tbody>
+              {pageRows.map((row, ri) => (
+                <BodyRow
+                  key={`${row.mo}|${row.line}|${ri}`}
+                  row={row}
+                  cols={cols}
+                  onDrill={onDrill}
+                />
+              ))}
+            </tbody>
+
+            <tfoot>
+              <FooterRow
+                label="SubTotal (page)"
+                data={subtotal}
                 cols={cols}
-                onDrill={onDrill}
+                footerKeys={footerKeys}
+                bold={false}
+                topBorder
               />
-            ))}
-          </tbody>
-
-          <tfoot>
-            <FooterRow
-              label="SubTotal"
-              data={subtotal}
-              cols={cols}
-              footerKeys={footerKeys}
-              bold={false}
-              topBorder
-            />
-            <FooterRow label="Total" data={total} cols={cols} footerKeys={footerKeys} bold />
-          </tfoot>
-        </table>
+            </tfoot>
+          </table>
+        </div>
+        {isFetching && !isLoading ? (
+          <div className="pointer-events-none col-start-1 row-start-1 z-10 flex items-center justify-center bg-background/50">
+            <Loader2 className="size-6 animate-spin text-primary" aria-hidden />
+          </div>
+        ) : null}
       </div>
       {extraStationCount > 0 ? (
         <p className="text-xs text-muted-foreground">
@@ -270,12 +273,12 @@ export function WipSummaryTab({
         <span className="shrink-0 text-muted-foreground">Total {totalItems} items</span>
 
         <div className="flex items-center gap-1">
-          <NavBtn disabled={page === 1} onClick={() => setPage(1)} label="First">
+          <NavBtn disabled={page <= 1} onClick={() => onPageChange?.(1)} label="First">
             «
           </NavBtn>
           <NavBtn
-            disabled={page === 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            onClick={() => onPageChange?.(Math.max(1, page - 1))}
             label="Prev"
           >
             ‹
@@ -290,7 +293,7 @@ export function WipSummaryTab({
                 key={p}
                 variant={p === page ? 'default' : 'outline'}
                 size="icon-xs"
-                onClick={() => setPage(p)}
+                onClick={() => onPageChange?.(p)}
                 aria-label={`Page ${p}`}
                 aria-current={p === page ? 'page' : undefined}
               >
@@ -299,13 +302,17 @@ export function WipSummaryTab({
             )
           )}
           <NavBtn
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            onClick={() => onPageChange?.(Math.min(totalPages, page + 1))}
             label="Next"
           >
             ›
           </NavBtn>
-          <NavBtn disabled={page === totalPages} onClick={() => setPage(totalPages)} label="Last">
+          <NavBtn
+            disabled={page >= totalPages}
+            onClick={() => onPageChange?.(totalPages)}
+            label="Last"
+          >
             »
           </NavBtn>
         </div>
@@ -313,10 +320,7 @@ export function WipSummaryTab({
         <div className="ml-auto flex items-center gap-2">
           <select
             value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setPage(1);
-            }}
+            onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
             className="h-6 rounded border border-input bg-transparent px-1 text-xs outline-none"
           >
             {PAGE_SIZE_OPTIONS.map((s) => (

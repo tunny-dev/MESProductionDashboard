@@ -1,30 +1,24 @@
-import { MES_S_CODES } from '@/config/api';
-import { mesPost } from '@/lib/mes-http';
-import { unwrapList } from '@/lib/unwrap-response';
+import { http } from '@/lib/http';
+import { ENDPOINTS, DEFAULT_FACTORY } from '@/config/api';
 
-const PRODUCTION_SYSTEM = 'sfcs';
-
-export const DEFAULT_FACTORY = import.meta.env.VITE_MES_FACTORY || 'VN';
+export { DEFAULT_FACTORY };
 
 /**
- * Danh mục công đoạn qua GET_MFG_TYPE.
- * Request:  { P_DC003: factory }  (vd: "VN")
- * Response: [{ MfgCode: "VN001", MfgType: "SMT", Factory: "VN" }, ...]
+ * Danh mục công đoạn qua GET /cim/getMfgType.
+ * Query:    ?factory=VN (tuỳ chọn)
+ * Response: [{ mfgCode: "VN001", mfgTypeName: "SMT", factory: "VN" }, ...]
  */
 export async function getStages({ factory = DEFAULT_FACTORY } = {}) {
-  const rows = await mesPost(
-    MES_S_CODES.production.getMfgType,
-    { P_DC003: factory ?? DEFAULT_FACTORY },
-    PRODUCTION_SYSTEM
-  );
-  return normalizeStageRows(unwrapList(rows));
+  const data = await http.get(ENDPOINTS.cim.mfgType, {
+    params: factory ? { factory } : {},
+  });
+  return normalizeStageRows(Array.isArray(data) ? data : []);
 }
 
 /**
  * Chuẩn hoá về [{ id: 'SMT', deptCode: 'VN001', factory: 'VN' }]
- * để downstream dùng `id` hiển thị và `deptCode` làm payload MD004
- * cho GET_PRODUCTION_LINE. Giữ tương thích ngược với payload cũ
- * MGMT_11_SELECT ({ DC001, DC002 }) và string trần (legacy).
+ * để downstream dùng `id` hiển thị và `deptCode` làm query `deptCode` cho
+ * GET /cim/getProductionLine. Vẫn chấp nhận vài biến thể tên field cũ.
  */
 function normalizeStageRows(rows) {
   if (!Array.isArray(rows)) return [];
@@ -42,9 +36,10 @@ function normalizeStageRows(rows) {
     }
     if (typeof row !== 'object' || row === null) continue;
 
-    // Mới: MfgType = tên công đoạn (SMT/DIP/FA), MfgCode = mã dept (VN001/...)
-    // Cũ (MGMT_11_SELECT): DC002 = tên công đoạn, DC001 = mã dept
+    // API mới: mfgTypeName = tên công đoạn (SMT/DIP/FA), mfgCode = mã dept (VN001/...)
     const rawId =
+      row.mfgTypeName ??
+      row.MfgTypeName ??
       row.mfgType ??
       row.MfgType ??
       row.dc002 ??

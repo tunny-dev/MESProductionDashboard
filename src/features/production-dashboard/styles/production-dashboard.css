@@ -72,18 +72,18 @@ html:has(.production-dashboard) {
   opacity: 0;
 }
 
-@keyframes alert-blink {
+@keyframes alert-pulse {
   0%,
   100% {
-    opacity: 0.12;
+    filter: brightness(1);
   }
   50% {
-    opacity: 0.6;
+    filter: brightness(1.25);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .production-dashboard .alert-blink {
-    animation: alert-blink 0.9s ease-in-out infinite;
+  .production-dashboard .alert-pulse {
+    animation: alert-pulse 1.1s ease-in-out infinite;
   }
 }

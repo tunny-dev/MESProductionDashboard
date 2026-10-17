@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import {
   getWipReport,
@@ -43,6 +43,12 @@ export function useWipReport({ params, enabled = false, queryKey: bumpKey = 0 })
     enabled,
     retry: 0,
     staleTime: 0,
+    // Bộ đếm Auto Reload (trong Summary) là nguồn refetch duy nhất — không để
+    // React Query tự refetch khi cửa sổ được focus lại.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    // Giữ trang cũ trong lúc tải trang mới — đổi số trang không nhấp nháy skeleton.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -57,6 +63,8 @@ export function useWipByStation({ params, enabled = false, queryKey: bumpKey = 0
     enabled,
     retry: 0,
     staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -89,6 +97,8 @@ export function useWipUnitSnList({
     enabled: enabled && Boolean(mo) && Boolean(line),
     retry: 0,
     staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

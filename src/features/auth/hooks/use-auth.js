@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-import { login } from '@/features/auth/api/auth';
+import { login, logout as apiLogout } from '@/features/auth/api/auth';
 import { useAuthStore } from '@/store/auth-store';
 
 export function useLogin() {
@@ -37,6 +37,14 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
+      const { refreshToken } = useAuthStore.getState();
+
+      try {
+        await apiLogout(refreshToken);
+      } catch {
+        /* bỏ qua */
+      }
+
       storeLogout();
     },
     onSuccess: () => {

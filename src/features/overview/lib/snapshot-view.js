@@ -122,11 +122,17 @@ export function buildLineDetailView(lineView, shift, currentMinutes) {
 
 /** Toàn bộ nhà máy, đã tính. */
 export function buildSnapshotView(snapshot) {
-  const { shift, currentMinutes } = snapshot;
-  const lines = snapshot.lines.map((raw) => buildLineView(raw, shift, currentMinutes));
+  // Guard: API mới chưa trả về snapshot dạng "mỗi line có scans/stops/plannedUph".
+  // Khi thiếu `lines`, dựng view rỗng thay vì crash (trang Tổng quan sẽ trống).
+  const shift = snapshot?.shift ?? null;
+  const currentMinutes = snapshot?.currentMinutes ?? 0;
+  const rawLines = Array.isArray(snapshot?.lines) ? snapshot.lines : [];
+  const lines = rawLines.map((raw) => buildLineView(raw, shift, currentMinutes));
 
   return {
-    ...snapshot,
+    ...(snapshot ?? {}),
+    shift,
+    currentMinutes,
     lines,
     kpi: buildKpi(lines, shift, currentMinutes),
   };

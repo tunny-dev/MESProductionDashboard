@@ -1,43 +1,64 @@
-import { mesPost } from '@/lib/mes-http';
-import { unwrapList } from '@/lib/unwrap-response';
-import { MES_S_CODES } from '@/config/api';
+import { http } from '@/lib/http';
+import { ENDPOINTS } from '@/config/api';
 
 /**
- * 4 nguồn dashboard, mỗi nguồn 1 request độc lập — hỏng nguồn nào chỉ
- * chết nguồn đó, không kéo theo 3 nguồn còn lại.
+ * 5 nguồn dashboard, mỗi nguồn 1 request độc lập — hỏng nguồn nào chỉ
+ * chết nguồn đó, không kéo theo các nguồn còn lại.
  *
- * Mỗi fetcher resolve `{ sCode, params, rows }` để màn debug hiển thị
- * nguyên request/response. Khi lỗi, `{ sCode, params }` được gắn vào
+ * Mỗi fetcher resolve `{ endpoint, params, rows }` để màn debug hiển thị
+ * nguyên request/response. Khi lỗi, `{ endpoint, params }` được gắn vào
  * `error.part` rồi throw tiếp để React Query giữ ở `query.error`.
  */
 
-async function postPart(sCode, params) {
+/** API trả về mảng cho hầu hết endpoint; `getMoSummary` trả 1 object → bọc mảng
+ * để downstream `.map` không vỡ.
+ * @param {unknown} data
+ * @returns {Array}
+ */
+function asRows(data) {
+  if (Array.isArray(data)) return data;
+  if (data === null || data === undefined) return [];
+  return [data];
+}
+
+/**
+ * Gọi 1 endpoint production (GET + query params).
+ * @param {string} endpoint
+ * @param {Record<string, unknown>} params
+ */
+async function getPart(endpoint, params) {
   try {
-    const res = await mesPost(sCode, params);
-    return { sCode, params, rows: unwrapList(res) };
+    const data = await http.get(endpoint, { params });
+    return { endpoint, params, rows: asRows(data) };
   } catch (error) {
-    error.part = { sCode, params };
+    error.part = { endpoint, params };
     throw error;
   }
 }
 
 /**
+ * `scope`: 'DAY' (mặc định) = cửa sổ ca; 'WO' = toàn bộ vòng đời work-order.
+ * API chỉ hiểu chuỗi 'WO'; bỏ hẳn `scope` cho ca để dùng mặc định shift window.
+ * @param {string|undefined} scope
+ * @returns {Record<string, string>}
+ */
+function scopeParam(scope) {
+  return scope === 'WO' ? { scope: 'WO' } : {};
+}
+
+/**
  * 1. Tổng nhập/xuất của 1 WO — nguồn cho 2 thẻ KPI đầu vào / đầu ra.
- * Trả [{ totalInput, totalOutput, planQty }].
- *
- * KHÔNG dùng Production_1_1_4: câu đó không lọc MO/chuyền nên gộp mọi WO
- * của công đoạn vào cùng một bảng. Đã bỏ hẳn khỏi dashboard.
+ * Trả [{ totalInput, totalOutput, planQty, ... }].
  */
 export function getMoSummaryPart({ mo, dateStr, dept, lineId, shift, scope }) {
-  const params = {
-    MO: mo,
-    SDATE: dateStr,
-    LINE: lineId,
-    DEPT: dept,
-    SHIFT: shift,
-    SCOPE: scope,
-  };
-  return postPart(MES_S_CODES.production.getMoSummary, params);
+  return getPart(ENDPOINTS.production.moSummary, {
+    sDate: dateStr,
+    mo,
+    line: lineId,
+    dept,
+    shift,
+    ...scopeParam(scope),
+  });
 }
 
 /**
@@ -45,54 +66,50 @@ export function getMoSummaryPart({ mo, dateStr, dept, lineId, shift, scope }) {
  * (plan/thực tế/UPH/NG) + 6 khung giờ s1..s6.
  */
 export function getWipReportPart({ mo, dateStr, dept, lineId, shift, model, scope }) {
-  const params = {
-    SDATE: dateStr,
-    MO: mo,
-    LINE: lineId,
-    DEPT: dept,
-    SHIFT: shift,
-    MODEL: model,
-    SCOPE: scope,
-  };
-  return postPart(MES_S_CODES.production.getWipReport, params);
+  return getPart(ENDPOINTS.production.wipReport, {
+    sDate: dateStr,
+    mo,
+    line: lineId,
+    dept,
+    shift,
+    model,
+    ...scopeParam(scope),
+  });
 }
 
 /**
- * 3. Biểu đồ 1 — Output & Achievement theo khung 2 giờ (DASH_CHART_OUTPUT).
- * Trả 6 dòng: slotIx, slotLabel, stationId, planOutput, actualOutput,
- * achievement. Khung không có sản lượng vẫn có dòng (giá trị 0) để trục X
- * của biểu đồ không bị lệch.
+ * 3. Biểu đồ 1 — Output & Achievement theo khung 2 giờ.
+ * Trả 6 dòng: slotIx, stationId, planOutput, actualOutput, achievement.
+ * Khung không có sản lượng vẫn có dòng (giá trị 0) để trục X không lệch.
  */
 export function getChartOutputPart({ mo, dateStr, dept, lineId, shift, model, scope }) {
-  const params = {
-    SDATE: dateStr,
-    MO: mo,
-    LINE: lineId,
-    DEPT: dept,
-    SHIFT: shift,
-    MODEL: model,
-    SCOPE: scope,
-  };
-  return postPart(MES_S_CODES.production.getProductionAchievement, params);
+  return getPart(ENDPOINTS.production.achievement, {
+    sDate: dateStr,
+    mo,
+    line: lineId,
+    dept,
+    shift,
+    model,
+    ...scopeParam(scope),
+  });
 }
 
 /**
- * 4. Biểu đồ 2 — Xu hướng UPH theo khung 2 giờ (DASH_CHART_UPH).
- * Trả 6 dòng: slotIx, slotLabel, stationId, uphActual, actualOutput,
- * uphTarget. `uphTarget` null khi bảng CIM_UNIT_PER_HOUR còn rỗng — FE tự
- * lấy số tạm trong lib/dashboard-target-uph.js.
+ * 4. Biểu đồ 2 — Xu hướng UPH theo khung 2 giờ.
+ * Trả 6 dòng: slotIx, stationId, uphActual, actualOutput, uphTarget.
+ * `uphTarget` null khi bảng CIM_UNIT_PER_HOUR còn rỗng — FE tự lấy số tạm trong
+ * lib/dashboard-target-uph.js.
  */
 export function getChartUphPart({ mo, dateStr, dept, lineId, shift, model, scope }) {
-  const params = {
-    SDATE: dateStr,
-    MO: mo,
-    LINE: lineId,
-    DEPT: dept,
-    SHIFT: shift,
-    MODEL: model,
-    SCOPE: scope,
-  };
-  return postPart(MES_S_CODES.production.getUphTrend, params);
+  return getPart(ENDPOINTS.production.uphTrend, {
+    sDate: dateStr,
+    mo,
+    line: lineId,
+    dept,
+    shift,
+    model,
+    ...scopeParam(scope),
+  });
 }
 
 /**
@@ -100,6 +117,11 @@ export function getChartUphPart({ mo, dateStr, dept, lineId, shift, model, scope
  * bù cho trạm có trong flow nhưng không có log trong ca đang xem.
  */
 export function getFlowPart({ mo, dateStr, dept, lineId, shift }) {
-  const params = { MO: mo, SDATE: dateStr, EDATE: dateStr, DEPT: dept, LINE: lineId, SHIFT: shift };
-  return postPart(MES_S_CODES.production.getFlowByMo, params);
+  return getPart(ENDPOINTS.production.flowByMo, {
+    sDate: dateStr,
+    mo,
+    line: lineId,
+    dept,
+    shift,
+  });
 }
