@@ -15,13 +15,11 @@ build/
 # =========================
 # Environment
 # =========================
-# .env được commit — chứa giá trị mặc định, không có secret thật.
-# .env.local dùng để override cá nhân (secret, URL khác...) — KHÔNG commit.
 .env.local
 .env.*.local
 
 # Keep example / environment templates
-!.env.example
+.env.example
 
 
 # =========================
@@ -83,3 +81,5 @@ vite.config.*.timestamp-*
 
 docs/
 design/
+db/
+scripts/
