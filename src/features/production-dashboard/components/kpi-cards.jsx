@@ -2,16 +2,16 @@ import { memo } from 'react';
 import { Gauge, Package, PackageCheck, Target, ClipboardList, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressLabel } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
   calculateAchievement,
-  formatNumber,
-  formatPercent,
   getAchievementColor,
 } from '@/features/production-dashboard/lib/calc';
+import { formatNumber, formatPercent } from '@/lib/format';
 
 /** 'yyyyMMdd' → 'dd/MM' cho dòng "Chạy 30/09 → 14/10". */
 function formatYmdShort(value) {
@@ -43,22 +43,22 @@ const cardStyles = {
   },
 };
 
-function LoadingCards() {
+function LoadingCards({ copy }) {
   return (
     <div
       className="relative grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5 xl:gap-3"
-      aria-label="Loading production KPIs"
+      aria-label={copy.loadingKpi}
     >
       <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/30 backdrop-blur-[1px]">
         <span className="flex items-center gap-2 rounded-lg border border-border-strong bg-card/95 px-3.5 py-2 text-xs font-medium text-foreground shadow-sm">
           <Loader2 className="size-4 animate-spin text-production-blue" />
-          <span>Đang tải số liệu KPI...</span>
+          <span>{copy.loadingKpi}</span>
         </span>
       </div>
       {Array.from({ length: 5 }, (_, index) => (
         <Card
           key={index}
-          className="h-full min-h-[96px] gap-0 border border-border bg-card py-0 ring-0 xl:min-h-[100px]"
+          className="h-full min-h-24 gap-0 border border-border bg-card py-0 ring-0 xl:min-h-25"
         >
           <div className="flex items-start justify-between gap-3 px-4 pt-3">
             <div className="grid min-w-0 flex-1 gap-2">
@@ -75,14 +75,25 @@ function LoadingCards() {
   );
 }
 
-function SummaryError({ message }) {
+function SummaryError({ message, copy, onRetry }) {
   return (
-    <Card className="flex min-h-[96px] items-center border border-danger/35 bg-danger/5 ring-0 xl:min-h-[100px]">
+    <Card className="flex min-h-24 items-center border border-danger/35 bg-danger/5 ring-0 xl:min-h-25">
       <CardContent className="flex items-center gap-3 px-4 py-3">
         <Target className="size-5 shrink-0 text-danger-text" aria-hidden="true" />
-        <p role="alert" className="text-sm font-medium text-danger-text">
+        <p role="alert" className="min-w-0 flex-1 text-sm font-medium text-danger-text">
           {message}
         </p>
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-danger/40 text-danger-text hover:bg-danger/10 hover:text-danger-text"
+            onClick={onRetry}
+          >
+            {copy.retry}
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -93,7 +104,7 @@ function MoInfoCard({ selectedWo, copy }) {
   return (
     <Card
       className={cn(
-        'h-full min-h-[96px] gap-0 overflow-hidden border bg-card py-0 ring-0 xl:min-h-[100px]',
+        'h-full min-h-24 gap-0 overflow-hidden border bg-card py-0 ring-0 xl:min-h-25',
         style.surface
       )}
     >
@@ -146,7 +157,7 @@ function KpiCard({ icon: Icon, title, value, unit, detail, color, achievement, g
   return (
     <Card
       className={cn(
-        'h-full min-h-[96px] gap-0 overflow-hidden border bg-card py-0 ring-0 xl:min-h-[100px]',
+        'h-full min-h-24 gap-0 overflow-hidden border bg-card py-0 ring-0 xl:min-h-25',
         style.surface
       )}
     >
@@ -216,15 +227,15 @@ export const KpiCards = memo(function KpiCards({
   selectedWo,
   loading,
   error,
+  uphTargetState = null,
   scope = 'DAY',
+  onRetry,
   copy,
 }) {
-  if (loading && !summary) return <LoadingCards />;
-  if (error || !summary) return <SummaryError message={copy.errors.summary} />;
+  if (loading && !summary) return <LoadingCards copy={copy} />;
+  if (error || !summary)
+    return <SummaryError message={copy.errors.summary} copy={copy} onRetry={onRetry} />;
 
-  // Phạm vi 'Cả WO': kế hoạch MF008 là của CẢ WO nên lúc này mới so được.
-  // Ở phạm vi 'Ca này' mà đem nhân với MF008 sẽ ra tỷ lệ thấp vô lý — WO chạy
-  // 14 ngày thì mỗi ca chỉ được ~7% dù cả WO đã vượt kế hoạch.
   const showWoProgress = scope === 'WO';
   const woPercent = calculateAchievement(summary.totalOutput, summary.planOutput);
   const woSpan =
@@ -265,13 +276,16 @@ export const KpiCards = memo(function KpiCards({
       title: copy.kpi.uph,
       value: formatNumber(summary.actualUph),
       unit: 'PCS/H',
-      detail: `${copy.kpi.uphTarget}: ${formatNumber(summary.targetUph)} PCS/H`,
+      detail:
+        uphTargetState === 'missing'
+          ? `${copy.kpi.uphTarget}: ${copy.kpi.uphTargetMissing}`
+          : uphTargetState === 'error'
+            ? `${copy.kpi.uphTarget}: ${copy.kpi.uphTargetError}`
+            : `${copy.kpi.uphTarget}: ${formatNumber(summary.targetUph)} PCS/H`,
       color: 'violet',
     },
     {
       icon: Target,
-      // Phạmvi 'Cả WO' thì con số này là tiến độ của cả WO, không phải tỷ lệ
-      // đạt kế hoạch của ca — gọi đúng tên tránh đọc nhầm.
       title: showWoProgress ? copy.woProgress.title : copy.kpi.achievement,
       value: formatPercent(achievement, 1),
       color: 'amber',
@@ -285,7 +299,6 @@ export const KpiCards = memo(function KpiCards({
       aria-label={copy.kpi.achievement}
       className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5 xl:gap-3"
     >
-      {/* MO info card — luôn render đầu tiên */}
       <MoInfoCard selectedWo={selectedWo} copy={copy} />
       {cards.map((card) => (
         <KpiCard key={card.title} {...card} copy={copy} />

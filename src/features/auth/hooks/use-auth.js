@@ -41,9 +41,7 @@ export function useLogout() {
 
       try {
         await apiLogout(refreshToken);
-      } catch {
-        /* bỏ qua */
-      }
+      } catch {}
 
       storeLogout();
     },

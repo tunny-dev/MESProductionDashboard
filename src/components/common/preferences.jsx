@@ -118,7 +118,7 @@ export function ThemeSwitcher({ className, contentStyle }) {
 
 function PreferenceChoiceGroup({ name, value, options, onChange }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-2 mt-2">
       {options.map(({ value: optionValue, label, icon: Icon }) => {
         const isSelected = value === optionValue;
 

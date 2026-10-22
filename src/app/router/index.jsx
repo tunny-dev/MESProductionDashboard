@@ -4,7 +4,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layouts/app-shell';
 import { Forbidden } from '@/components/common/forbidden';
 import { NotFound } from '@/components/common/not-found';
-import { RequireAuth, RequireOverviewAccess } from './require-auth';
+import { RequireAuth, RequireGuest, RequireOverviewAccess } from './require-auth';
 import { RouteErrorPage, FullscreenRouteErrorPage } from './route-error-page';
 import { ROUTES } from './routes';
 
@@ -30,10 +30,22 @@ const WipReportPage = lazy(() =>
 );
 
 export const router = createBrowserRouter([
-  { path: ROUTES.LOGIN, element: <LoginPage />, errorElement: <RouteErrorPage /> },
+  {
+    path: ROUTES.LOGIN,
+    element: (
+      <RequireGuest>
+        <LoginPage />
+      </RequireGuest>
+    ),
+    errorElement: <RouteErrorPage />,
+  },
   {
     path: ROUTES.FORGOT_PASSWORD,
-    element: <ForgotPasswordPage />,
+    element: (
+      <RequireGuest>
+        <ForgotPasswordPage />
+      </RequireGuest>
+    ),
     errorElement: <RouteErrorPage />,
   },
 

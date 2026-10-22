@@ -1,28 +1,10 @@
 export const DASHBOARD_CONFIG = {
-  // Chu kỳ tự làm mới số liệu. 5 phút là đủ cho màn hình treo tường; đặt
-  // quá ngắn sẽ dồn nhiều truy vấn nặng (mỗi lần tải 6 nguồn) và gây tải SFCS.
   refreshIntervalSec: 300,
   requestTimeoutSec: 10,
   wipLimit: 300,
   autoRotate: { enabled: false, intervalSec: 20 },
   achievementThreshold: { green: 95, yellow: 90 },
   processes: ['SMT', 'DIP', 'FA'],
-  /**
-   * Phạm vi xem dữ liệu KHÔNG có control riêng — nó là lựa chọn thứ 3 trong
-   * ô "Ca làm việc" (`shifts` bên dưới + mục 'Toàn bộ WO'):
-   *
-   *   'DAY' (ca ngày / ca đêm) : số của ca đang chọn (ngày + ca).
-   *   'WO'  (toàn bộ WO)       : gom toàn bộ log của WO trên chuyền, không
-   *                             lọc ngày/ca; 6 khung thành 6 nhóm ngày.
-   *
-   * Vì sao gộp chứ không tách control: MF008 là kế hoạch của CẢ WO mà 74% WO
-   * chạy trên 2 ngày trở lên (đã kiểm 299 WO từ 01/08). Lọc theo ca rồi chia
-   * cho MF008 thì WO càng chạy lâu càng "xông" — WO chạy 14 ngày thì mỗi ca
-   * chỉ được ~7%. Chỉ chế độ 'WO' mới so được với MF008.
-   *
-   * `shifts` dưới đây chỉ liệt kê 2 ca thật; mục 'Toàn bảoWO' do header thêm
-   * vào để không lẫn với ca có khung giờ 2 giờ.
-   */
   shifts: [
     {
       id: 'day',
@@ -96,7 +78,6 @@ export const DASHBOARD_CONFIG = {
   },
 };
 
-/** Số khung cố định của mọi chế độ — SQL cũng cứng 6 ô (s1..s6 / slotIx 0..5). */
 const SLOT_COUNT = 6;
 
 /** 'yyyyMMdd' → Date tại đầu ngày (giờ địa phương, khớp cách SQL cắt chuỗi). */
@@ -113,19 +94,9 @@ function formatDayShort(date) {
 
 /**
  * Các nhóm ngày đang dùng cho phạm vi "Toàn bộ WO".
- *
  * Công thức phải khớp ĐÚNG với SQL:
  *   SQL : bucket = (dayOffset * 6) / soNgay     — chia nguyên, dayOffset từ 0
  *   JS  : dayOffset của bucket k nằm trong [ceil(k*nd/6), ceil((k+1)*nd/6) - 1]
- *
- * `nd` là số ngày LỊCH, KHÔNG phải số ngày có log. WO chạy 30/09→14/10 mất ngày
- * 11/10 thì COUNT(DISTINCT TA003) = 14 còn DATEDIFF = 15 — nếu lấy 14 thì log
- * ngày 14/10 rơi vào bucket 6 (ngoài 0..5) và biến mất khỏi biểu đồ.
- *
- * LUÔN trả về 6 phần tử (slotIx 0..5). Bucket không có ngày nào được đánh
- * `empty: true` để FE biết ẩn cột nhưng vẫn giữ đúng vị trí index — nếu trả
- * ít hơn 6 thì normalizer tra `slots[ix]` bị undefined và line bị lệch.
- *
  * @returns {Array<{id,label,slotIx,startDay,endDay,endDate,empty}>|null}
  */
 export function buildWoSlots(woStartDate, woDayCount, slotCount = SLOT_COUNT) {
@@ -154,7 +125,6 @@ export function buildWoSlots(woStartDate, woDayCount, slotCount = SLOT_COUNT) {
  * Bộ khung đang dùng, theo phạm vi đang chọn.
  * Chế độ 'WO' chưa có dữ liệu khoảng ngày thì lùi về khung của ca — không
  * để trang trắng trong lúc GET_SUMMARY đang tải.
- *
  * Mọi phần tử đều mang `slotIx` (vị trí gốc 0..5 trong SQL) để normalizer ánh
  * xạ dòng SQL → khung hiển thị.
  */

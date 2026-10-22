@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatNumber } from '@/features/production-dashboard/lib/calc';
+import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 8;
@@ -27,7 +27,15 @@ const PAGE_SIZE = 8;
  * Ô WO trên header: readonly, bấm mở dialog chọn từ bảng.
  * Chưa chọn thì hiện placeholder, không cho gõ tay.
  */
-export function WoPickerTrigger({ label, valueLabel, placeholder, disabled, loading, onOpen }) {
+export function WoPickerTrigger({
+  label,
+  valueLabel,
+  placeholder,
+  loadingText,
+  disabled,
+  loading,
+  onOpen,
+}) {
   return (
     <div className="grid min-w-0 gap-1">
       <span className="truncate text-[10px] font-medium text-muted-foreground xl:text-[11px]">
@@ -47,7 +55,7 @@ export function WoPickerTrigger({ label, valueLabel, placeholder, disabled, load
             !valueLabel && 'font-normal text-muted-foreground'
           )}
         >
-          {loading ? 'Đang tải WO...' : valueLabel || placeholder}
+          {loading ? (loadingText ?? '…') : valueLabel || placeholder}
         </span>
         {loading ? (
           <Loader2

@@ -22,7 +22,10 @@ import {
   getSlotState,
   getStationStatus,
 } from '@/features/production-dashboard/lib/calc';
-import { getTargetUph } from '@/features/production-dashboard/lib/dashboard-target-uph';
+import {
+  getTargetUph,
+  resolveUphTargetState,
+} from '@/features/production-dashboard/lib/dashboard-target-uph';
 import {
   DASHBOARD_CONFIG,
   getDashboardThemeStyle,
@@ -31,7 +34,7 @@ import {
   getStationTargetUph,
 } from '@/features/production-dashboard/lib/dashboard-config';
 import { useTheme } from '@/hooks/use-theme';
-import { getDashboardCopy } from '@/features/production-dashboard/lib/dashboard-copy';
+import { getDashboardCopy } from '@/features/production-dashboard/lib/dashboard-strings';
 import { readPreference, writePreference } from '@/lib/preferences';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toast';
@@ -57,10 +60,10 @@ function getStoredChartLayout() {
 
 export function ProductionDashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || 'vi';
 
-  const copy = useMemo(() => getDashboardCopy(language), [language]);
+  const copy = useMemo(() => getDashboardCopy(t), [t]);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const themeStyle = useMemo(() => getDashboardThemeStyle(resolvedTheme), [resolvedTheme]);
 
@@ -122,10 +125,11 @@ export function ProductionDashboardPage() {
 
   const group = process ?? mfgInfo?.mfgType ?? null;
   const [applied, setApplied] = useState(null);
-  const canSearch = Boolean(lineId && shift && group && woValue);
+  const canSearch = Boolean(lineId && shift && group && deptCode && woValue);
   const query = useDashboardData({
     lineId: applied?.lineId ?? null,
-    group: applied?.group ?? null,
+    dept: applied?.dept ?? null,
+    process: applied?.group ?? null,
     model,
     mo: applied?.mo ?? null,
     date: applied?.date ?? null,
@@ -145,51 +149,113 @@ export function ProductionDashboardPage() {
     refetch,
     parts,
     flowStations,
+    cycleTime,
   } = query;
+
+  // Map trạm -> UPH mục tiêu từ CimCycleTime.
+  const cycleTimeTargetMap = useMemo(() => {
+    const map = new Map();
+    for (const row of cycleTime ?? []) {
+      const stage = row?.Stage ?? row?.stage ?? row?.STAGE;
+      const target = Number(row?.TargetUph ?? row?.targetUph ?? row?.TARGET_UPH);
+      if (stage != null && Number.isFinite(target) && target > 0) {
+        map.set(String(stage), target);
+      }
+    }
+    return map;
+  }, [cycleTime]);
 
   const viewData = useMemo(() => {
     if (!data) return null;
+    const finalStationTarget =
+      (data.stations ?? []).at(-1)?.targetUph ??
+      cycleTimeTargetMap.get(String((data.stations ?? []).at(-1)?.stationId)) ??
+      null;
+    const ctTarget = (stationId) =>
+      (data.stations ?? []).find((s) => s.stationId === stationId)?.targetUph ??
+      cycleTimeTargetMap.get(String(stationId)) ??
+      null;
     return {
       ...data,
       summary: {
         ...data.summary,
-        targetUph: data.summary.targetUph ?? getTargetUph({ process, line: lineId }),
+        targetUph:
+          data.summary.targetUph ??
+          (data.stations ?? []).at(-1)?.targetUph ??
+          getTargetUph({ process, line: lineId }),
       },
+      uphTrend: (data.uphTrend ?? []).map((row) => ({
+        ...row,
+        uphTarget: row.uphTarget ?? ctTarget(row.stationId) ?? finalStationTarget,
+      })),
     };
-  }, [data, process, lineId]);
+  }, [data, process, lineId, cycleTimeTargetMap]);
 
   const { count: consecutiveFailures, reset: resetFailures } =
     useConsecutiveFailures(failureReason);
 
+  // 'ROUTING' = xem toàn bộ trạm của WO trên mọi chuyền .
+  const routingMode = scopeId === 'ROUTING';
+  // KPI & biểu đồ chỉ phân biệt "theo ca" và "theo ngày của WO"
+  const displayScope = routingMode ? 'WO' : scopeId;
+
   const lineConfig = useMemo(() => {
     if (!applied?.lineId) return null;
 
-    const wipIds = new Set((viewData?.stations ?? []).map((s) => s.stationId));
-    const flowQty = new Map(flowStations.map((s) => [s.id, s.qty]));
-    const stationsFromWip = (viewData?.stations ?? []).map((s) => ({
-      id: s.stationId,
-      name: s.opName || s.stationName || s.stationId,
-      shortName: s.opName || s.stationName || s.stationId,
-      qty: flowQty.get(s.stationId) ?? null,
-    }));
+    const wipById = new Map(
+      (viewData?.stations ?? []).map((station) => [station.stationId, station])
+    );
+    const flowQty = new Map(flowStations.map((station) => [station.id, station.qty]));
 
-    const missingInWip = flowStations
-      .filter((s) => !wipIds.has(s.id))
-      .map((s) => ({ id: s.id, name: s.name, shortName: s.shortName, qty: s.qty ?? null }));
-
-    const stations = [...stationsFromWip, ...missingInWip];
-    if (stations.length > 0) {
-      return {
-        id: applied.lineId,
-        name: applied.lineId,
-        type: applied.group ?? '',
-        group: applied.group ?? '',
-        models: [],
-        modelProfiles: {},
-        stations,
-      };
+    // Danh sách trạm theo thứ tự flow (full routing) để các trạm chưa chạy hôm
+    // nay vẫn xuất hiện (với trạng thái STOP) thay vì biến mất. Trạm có dữ liệu
+    // wip được merge vào; trạm thiếu thì lấy từ flow.
+    const stations = [];
+    const seen = new Set();
+    for (const flowStation of flowStations) {
+      const wip = wipById.get(flowStation.id);
+      stations.push(
+        wip
+          ? {
+              id: wip.stationId,
+              name: wip.opName || wip.stationName || wip.stationId,
+              shortName: wip.opName || wip.stationName || wip.stationId,
+              qty: flowQty.get(flowStation.id) ?? null,
+              line: wip.line ?? null,
+            }
+          : {
+              id: flowStation.id,
+              name: flowStation.name,
+              shortName: flowStation.shortName,
+              qty: flowStation.qty ?? null,
+              line: flowStation.line ?? null,
+            }
+      );
+      seen.add(flowStation.id);
     }
-    return null;
+    // Trạm có wip nhưng không có trong flow (flow chưa tải xong).
+    for (const wipStation of viewData?.stations ?? []) {
+      if (seen.has(wipStation.stationId)) continue;
+      stations.push({
+        id: wipStation.stationId,
+        name: wipStation.opName || wipStation.stationName || wipStation.stationId,
+        shortName: wipStation.opName || wipStation.stationName || wipStation.stationId,
+        qty: flowQty.get(wipStation.stationId) ?? null,
+        line: wipStation.line ?? null,
+      });
+      seen.add(wipStation.stationId);
+    }
+
+    if (stations.length === 0) return null;
+    return {
+      id: applied.lineId,
+      name: applied.lineId,
+      type: applied.group ?? '',
+      group: applied.group ?? '',
+      models: [],
+      modelProfiles: {},
+      stations,
+    };
   }, [flowStations, applied, viewData?.stations]);
 
   const flowLoading = parts.some((p) => p.key === 'flow' && p.status === 'loading');
@@ -231,7 +297,7 @@ export function ProductionDashboardPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setClockTime((currentTime) => new Date(currentTime.getTime() + 1000));
+      setClockTime(new Date());
     }, 1000);
 
     return () => window.clearInterval(timer);
@@ -299,7 +365,8 @@ export function ProductionDashboardPage() {
   const slotStates = useMemo(() => {
     const slotList = slots ?? [];
     if (!slotList.length) return [];
-    if (scopeId === 'WO') return slotList.map(() => 'complete');
+
+    if (scopeId === 'WO' || scopeId === 'ROUTING') return slotList.map(() => 'complete');
     if (dateKey < todayKey) return slotList.map(() => 'complete');
     if (dateKey > todayKey) return slotList.map(() => 'future');
     return slotList.map((slot) => getSlotState(slot, clockMinuteDate, shift));
@@ -335,13 +402,14 @@ export function ProductionDashboardPage() {
             process,
             line: station.line ?? lineId,
             op: station.stationId,
-            apiTarget: station.targetUph,
+            apiTarget: station.targetUph ?? cycleTimeTargetMap.get(String(station.stationId)),
           }),
           ...(modelProfile?.uphAvailable === false ? { targetUph: null, actualUph: null } : {}),
           status: getStationStatus(station, {
             lastCompletedSlotIndex,
             isCurrentShift: isViewingCurrentShift,
             now: statusNow,
+            woMode: scopeId === 'WO' || scopeId === 'ROUTING',
           }),
         };
       });
@@ -361,7 +429,10 @@ export function ProductionDashboardPage() {
           process,
           line: metrics.line ?? lineId,
           op: stationConfig.id,
-          apiTarget: metrics.targetUph ?? configuredTargetUph,
+          apiTarget:
+            metrics.targetUph ??
+            cycleTimeTargetMap.get(String(stationConfig.id)) ??
+            configuredTargetUph,
         }),
         ...(modelProfile?.uphAvailable === false ? { targetUph: null, actualUph: null } : {}),
         stationId: stationConfig.id,
@@ -369,6 +440,7 @@ export function ProductionDashboardPage() {
           lastCompletedSlotIndex,
           isCurrentShift: isViewingCurrentShift,
           now: statusNow,
+          woMode: scopeId === 'WO' || scopeId === 'ROUTING',
         }),
       };
     });
@@ -384,8 +456,62 @@ export function ProductionDashboardPage() {
     isViewingCurrentShift,
     clockMinuteDate,
     shiftEndDate,
+    cycleTimeTargetMap,
   ]);
+
   const bottleneckId = useMemo(() => findBottleneck(stationRows), [stationRows]);
+
+  // Chưa maintain UPH sẽ báo warning
+  const uphTargetState = useMemo(() => {
+    const cyclePart = parts.find((part) => part.key === 'cycleTime');
+    return resolveUphTargetState({
+      hasData: Boolean(viewData),
+      hasTarget: stationRows.some((station) => Number(station.targetUph) > 0),
+      cycleTimeStatus: cyclePart?.status,
+    });
+  }, [parts, viewData, stationRows]);
+
+  const uphTargetToastRef = useRef({ key: null, state: null });
+  useEffect(() => {
+    if (!applied) {
+      uphTargetToastRef.current = { key: null, state: null };
+      return;
+    }
+
+    const key = [applied.mo, applied.lineId, applied.date, applied.shift].join('|');
+    if (!uphTargetState) {
+      uphTargetToastRef.current = { key, state: null };
+      return;
+    }
+    if (uphTargetToastRef.current.key === key && uphTargetToastRef.current.state === uphTargetState)
+      return;
+
+    uphTargetToastRef.current = { key, state: uphTargetState };
+    toast.add(
+      uphTargetState === 'error'
+        ? {
+            title: copy.kpi.cycleTimeErrorTitle,
+            description: copy.kpi.cycleTimeErrorDesc,
+            type: 'warning',
+            timeout: 6000,
+          }
+        : {
+            title: copy.kpi.cycleTimeMissingTitle,
+            description: copy.kpi.cycleTimeMissingDesc,
+            type: 'warning',
+            timeout: 6000,
+          }
+    );
+  }, [applied, uphTargetState, copy]);
+
+  const finalStationId = useMemo(() => {
+    const apiStations = viewData?.stations ?? [];
+
+    // Biểu đồ (output/UPH trend) cần trạm CUỐI CÙNG CÓ DỮ LIỆU hôm nay,
+    if (apiStations.length > 0) return apiStations.at(-1)?.stationId;
+    if (flowStations.length > 0) return flowStations.at(-1)?.id;
+    return stationRows.at(-1)?.stationId ?? null;
+  }, [viewData?.stations, flowStations, stationRows]);
   const lastUpdated =
     viewData?.updatedAt && Number.isFinite(new Date(viewData.updatedAt).getTime())
       ? format(new Date(viewData.updatedAt), 'HH:mm:ss')
@@ -462,14 +588,25 @@ export function ProductionDashboardPage() {
   }
 
   function handleSearch() {
-    if (!lineId || !shift || !group || !woValue) return;
-    setApplied({
+    if (!lineId || !shift || !group || !deptCode || !woValue) return;
+    const next = {
       lineId,
       group,
+      dept: deptCode,
       mo: woValue,
       date: dateKey,
       shift: shift.id,
-    });
+    };
+    const unchanged =
+      applied !== null &&
+      applied.lineId === next.lineId &&
+      applied.dept === next.dept &&
+      applied.mo === next.mo &&
+      applied.date === next.date &&
+      applied.shift === next.shift;
+    setApplied(next);
+
+    if (unchanged) refetch();
   }
 
   function handleLinePickerApply(nextLineId, nextProcess) {
@@ -553,7 +690,11 @@ export function ProductionDashboardPage() {
             <CascadeGate title={copy.cascade.searchTitle} hint={copy.cascade.searchHint} />
           ) : !lineConfig ? (
             flowLoading ? (
-              <CascadeGate title={copy.loading} hint={copy.cascade.flowHint} loading />
+              <CascadeGate
+                title={copy.cascade.flowLoadingTitle}
+                hint={copy.cascade.flowLoadingHint}
+                loading
+              />
             ) : (
               <CascadeGate
                 title={copy.cascade.flowTitle}
@@ -566,10 +707,8 @@ export function ProductionDashboardPage() {
               />
             )
           ) : !viewData && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES ? (
-            // Sập hẳn: một màn lỗi chung thay vì năm khối đỏ rời rạc.
             <DataDownScreen onRetry={handleRetry} />
           ) : !viewData && isError ? (
-            // Hỏng lẻ tẻ, chưa đủ ngưỡng sập: một panel gọn, poll sau tự thử lại.
             <CascadeGate
               title={copy.errors.initial}
               hint={copy.errors.allSources}
@@ -600,7 +739,9 @@ export function ProductionDashboardPage() {
                   selectedWo={displayWo}
                   loading={isLoading}
                   error={Boolean(viewData?.errors?.summary) || globalError}
-                  scope={scopeId}
+                  uphTargetState={uphTargetState}
+                  scope={displayScope}
+                  onRetry={handleRetry}
                   copy={copy}
                 />
                 <FlowStrip
@@ -623,13 +764,15 @@ export function ProductionDashboardPage() {
                   error={Boolean(viewData?.errors?.stations) || globalError}
                   hourlyError={Boolean(viewData?.errors?.hourly)}
                   statusError={Boolean(viewData?.errors?.stationStatus)}
+                  uphTargetState={uphTargetState}
+                  onRetry={handleRetry}
                   copy={copy}
                 />
                 <DashboardCharts
                   hourly={viewData?.hourly}
                   uphTrend={viewData?.uphTrend}
                   stations={stationRows}
-                  finalStationId={stationRows.at(-1)?.stationId}
+                  finalStationId={finalStationId}
                   slots={slots}
                   slotStates={slotStates}
                   loading={isLoading}
@@ -639,9 +782,11 @@ export function ProductionDashboardPage() {
                   globalError={globalError}
                   bottleneckId={bottleneckId}
                   copy={copy}
+                  scope={displayScope}
                   lineType={lineConfig.type}
                   chartLayout={chartLayout}
                   onChartLayoutChange={setChartLayout}
+                  onRetry={handleRetry}
                 />
               </div>
             </>

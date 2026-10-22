@@ -28,11 +28,7 @@ export function WipReportPage() {
 
   const enabled = queryParams !== null;
 
-  // Phân trang phía server: gộp page/pageSize vào params của query summary.
-  const listParams = useMemo(
-    () => (queryParams ? { ...queryParams, page, pageSize } : null),
-    [queryParams, page, pageSize]
-  );
+  const listParams = queryParams;
 
   const { data, isLoading, isFetching } = useWipReport({
     params: listParams,
@@ -45,6 +41,24 @@ export function WipReportPage() {
     enabled,
     queryKey,
   });
+
+  const allRows = useMemo(() => data?.items ?? [], [data]);
+  const totalItems = allRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  const safePage = Math.min(page, totalPages);
+
+  const pagedData = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return {
+      ...(data ?? {}),
+      items: allRows.slice(start, start + pageSize),
+      total: totalItems,
+      page: safePage,
+      pageSize,
+      totalPages,
+    };
+  }, [data, allRows, safePage, pageSize, totalItems, totalPages]);
 
   function handleQuery(params) {
     setQueryParams(params);
@@ -59,7 +73,6 @@ export function WipReportPage() {
     setPage(1);
   }
 
-  // Trên WIP khi action: NotInput or cột trạm → chuyển sang tab Unit S/N List.
   const handleDrill = useCallback((row, columnKey) => {
     const drillInfo = drillFromColumnKey(columnKey);
     const mode = drillInfo.mode;
@@ -79,8 +92,6 @@ export function WipReportPage() {
 
   const handleRefetch = useCallback(() => {
     setReportTime(format(new Date(), 'yyyy/MM/dd HH:mm:ss'));
-    // Tăng queryKey để đổi key → React Query tự fetch lại (cả report lẫn by-station).
-    // Không gọi thêm refetch() nữa để tránh gọi trùng 2 request.
     setQueryKey((k) => k + 1);
   }, []);
 
@@ -140,19 +151,21 @@ export function WipReportPage() {
           className={activeTab !== 'summary' ? 'hidden' : ''}
         >
           <WipSummaryTab
-            data={data}
+            data={pagedData}
             stationData={stationData}
             onBackToQuery={() => setActiveTab('query')}
-            mfgType={queryParams?.mfgType}
+            // Tên công đoạn (SMT/DIP/FA) để hiển thị; mã bộ phận đã gửi xuống SP
+            // nằm trong `queryParams.mfgType`.
+            mfgType={queryParams?.mfgTypeName}
             isLoading={isLoading}
             isFetching={isFetching}
             reportTime={reportTime}
             moCreateDateFrom={queryParams?.moCreateDateFrom}
             moCreateDateTo={queryParams?.moCreateDateTo}
-            page={page}
+            page={safePage}
             pageSize={pageSize}
-            totalItems={data?.total ?? 0}
-            totalPages={data?.totalPages ?? 1}
+            totalItems={totalItems}
+            totalPages={totalPages}
             onPageChange={setPage}
             onPageSizeChange={handlePageSizeChange}
             onRefetch={handleRefetch}

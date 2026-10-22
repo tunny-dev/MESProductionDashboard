@@ -1,31 +1,29 @@
-import { http } from '@/lib/http';
-import { ENDPOINTS, DEFAULT_FACTORY } from '@/config/api';
+import { MES_S_CODES, DEFAULT_FACTORY } from '@/config/api';
+import { mesRows } from '@/lib/mes-http';
 
 export { DEFAULT_FACTORY };
 
 /**
- * Danh mục công đoạn qua GET /cim/getMfgType.
- * Query:    ?factory=VN (tuỳ chọn)
- * Response: [{ mfgCode: "VN001", mfgTypeName: "SMT", factory: "VN" }, ...]
+ * Danh mục công đoạn — sCode `getMfgType`.
+ * Payload:  `{ factory: 'VN' }`
+ * Response: `[{ mfgCode: 'VN001', mfgTypeName: 'SMT', factory: 'VN' }, ...]`
  */
 export async function getStages({ factory = DEFAULT_FACTORY } = {}) {
-  const data = await http.get(ENDPOINTS.cim.mfgType, {
-    params: factory ? { factory } : {},
+  const rows = await mesRows(MES_S_CODES.production.getMfgType, {
+    factory: factory ?? DEFAULT_FACTORY,
   });
-  return normalizeStageRows(Array.isArray(data) ? data : []);
+  return normalizeStageRows(rows);
 }
 
 /**
- * Chuẩn hoá về [{ id: 'SMT', deptCode: 'VN001', factory: 'VN' }]
- * để downstream dùng `id` hiển thị và `deptCode` làm query `deptCode` cho
- * GET /cim/getProductionLine. Vẫn chấp nhận vài biến thể tên field cũ.
+ * Chuẩn hoá về `[{ id: 'SMT', deptCode: 'VN001', factory: 'VN' }]` để downstream
+ * dùng `id` hiển thị và `deptCode` làm payload cho sCode `getProductionLine`.
  */
 function normalizeStageRows(rows) {
   if (!Array.isArray(rows)) return [];
   const seen = new Set();
   const out = [];
   for (const row of rows) {
-    // Legacy: BE trả về plain string — wrap lại, deptCode unknown
     if (typeof row === 'string') {
       const id = row.trim();
       if (id && !seen.has(id.toUpperCase())) {
@@ -36,7 +34,6 @@ function normalizeStageRows(rows) {
     }
     if (typeof row !== 'object' || row === null) continue;
 
-    // API mới: mfgTypeName = tên công đoạn (SMT/DIP/FA), mfgCode = mã dept (VN001/...)
     const rawId =
       row.mfgTypeName ??
       row.MfgTypeName ??

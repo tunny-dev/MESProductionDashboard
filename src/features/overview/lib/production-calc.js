@@ -1,20 +1,3 @@
-/**
- * NGHIỆP VỤ TÍNH TOÁN SẢN LẤU (doc.md mục 3).
- *
- * GIẢ ĐỊNH (BE chưa chốt schema, sẽ thay khi nối API thật):
- * - Ca làm việc, tính bằng phút kể từ 00:00, KHÔNG vắt qua nửa đêm:
- *     Ca 1 = 08:00–16:00 (480–960) · Ca 2 = 16:00–24:00 (960–1440) · Ca 3 = 00:00–08:00 (0–480)
- *   Ca 2 kết thúc lúc 24:00 nên không có ca nào vắt qua nửa đêm: phép trừ
- *   khoảng luôn cho ra số phút, không cần xử lý wrap.
- * - Mỗi ca có một khối giờ nghỉ lấy từ ShiftCalendar. Giờ nghỉ không tính
- *   vào phút làm việc hiệu dụng, và trong giờ nghỉ thì target dừng lại.
- * - Sản lượng = số scan PASS ở trạm cuối line. Lỗi = số scan FAIL.
- * - Yield = (tổng - lỗi) / tổng.
- *
- * Điểm quan trọng: TARGET LUÔN LUỸ TIẾN ĐẾN THỜI ĐIỂM HIỆN TẠI, không so với
- * target cả ca. Line đang giữa ca không bị đỏ oan vì chưa tới cuối ca.
- */
-
 import { LINE_STATUS } from './status-map.js';
 
 /** Số phút trong một giờ. */
@@ -22,10 +5,6 @@ const MINUTES_PER_HOUR = 60;
 
 /**
  * Số phút làm việc hiệu dụng trong khoảng [fromMinutes, toMinutes).
- *
- * Khoảng nghỉ được cắt khỏi khoảng làm việc, rồi chỉ tính phần giao với
- * khoảng [from, to). Nhờ vậy gọi hàm này cho bất kỳ đoạn nào cũng đúng:
- * không cần thủ tụng "cắt đầu ca, cắt giờ nghỉ, cắt giờ hiện tại".
  */
 export function effectiveWorkMinutes(shift, fromMinutes, toMinutes) {
   const start = Math.max(fromMinutes, shift.startMinutes);
@@ -35,7 +14,6 @@ export function effectiveWorkMinutes(shift, fromMinutes, toMinutes) {
   const totalMinutes = end - start;
   if (!shift.hasRest) return totalMinutes;
 
-  // Khoảng nghỉ nằm trong trục phút tuyệt đối từ đầu ca.
   const restFrom = shift.startMinutes + shift.restStartMinutes;
   const restTo = shift.startMinutes + shift.restEndMinutes;
   const restOverlap = Math.max(0, Math.min(end, restTo) - Math.max(start, restFrom));
@@ -45,7 +23,6 @@ export function effectiveWorkMinutes(shift, fromMinutes, toMinutes) {
 
 /**
  * Target lũy tiến tới một mốc thời gian, theo phút.
- *
  * = UPH kế hoạch × (phút làm việc hiệu dụng từ đầu ca tới mốc).
  */
 export function cumulativeTarget({ shift, plannedUph, fromMinutes, toMinutes }) {
@@ -55,7 +32,7 @@ export function cumulativeTarget({ shift, plannedUph, fromMinutes, toMinutes }) 
 }
 
 /** Target của một khung giờ, dùng cho bảng "sản lượng theo giờ". */
-export function hourTarget({ shift, plannedUph, hourStartMinutes, hourEndMinutes }) {
+function hourTarget({ shift, plannedUph, hourStartMinutes, hourEndMinutes }) {
   return cumulativeTarget({
     shift,
     plannedUph,
@@ -66,7 +43,6 @@ export function hourTarget({ shift, plannedUph, hourStartMinutes, hourEndMinutes
 
 /**
  * Có đang nằm trong giờ nghỉ không.
- *
  * Dùng để không để line bị đỏ oan khi đang giờ nghỉ, và để biểu đồ
  * tô vùng xám nhạt đúng chỗ.
  */
@@ -86,7 +62,6 @@ export function calcYield(passCount, failCount) {
 
 /**
  * UPH của một khung giờ.
- *
  * Chia cho phút làm việc hiệu dụng của khung đó, không chia cho 60: giờ có
  * nghỉ thì làm việc ít hơn 60 phút, chia 60 sẽ báo UPH thấp oan.
  */
@@ -98,10 +73,8 @@ export function calcUph({ shift, passCount, fromMinutes, toMinutes }) {
 
 /**
  * Xác định trạng thái của một line tại thời điểm hiện tại.
- *
  * @param atRiskThreshold      ngưỡng % dưới đó là "Cảnh báo" (mặc định 90)
  * @param stoppedAfterMinutes  quá phút không scan (khi không phải giờ nghỉ) là "Dừng"
- *
  * Cả hai ngưỡng lấy từ cấu hình theo line/model, không hard-code ở component.
  */
 export function resolveLineStatus({
@@ -121,7 +94,6 @@ export function resolveLineStatus({
     return { key: 'idle', ...LINE_STATUS.idle, achievement: null };
   }
 
-  // Đang trong giờ nghỉ thì không phán "Dừng": line đang nghỉ là bình thường.
   if (!isResting && minutesSinceLastScan >= stoppedAfterMinutes) {
     return {
       key: 'stopped',
@@ -133,8 +105,6 @@ export function resolveLineStatus({
 
   const achievement = target > 0 ? round1((passCount / target) * 100) : null;
 
-  // Chưa có target để so (đầu ca chưa qua phút nào làm việc) thì coi là đạt,
-  // để line không đỏ oan lúc mới vào ca.
   if (achievement === null) {
     return { key: 'onTrack', ...LINE_STATUS.onTrack, achievement: null };
   }
@@ -150,7 +120,6 @@ export function resolveLineStatus({
 
 /**
  * Gom các mốc theo giờ trong một ca, cho biểu đồ lũy tiến và bảng theo giờ.
- *
  * @param scans  [{ minutes, pass, fail }] đã sắp xếp theo thời gian
  * @param stops  [{ fromMinutes, toMinutes, reason }] các khoảng line dừng
  * @param currentMinutes  mốc "bây giờ"; null = ca đã kết thúc, vẽ trọn ca
@@ -215,7 +184,6 @@ export function buildHourlyBuckets({
 
 /**
  * Chuỗi điểm cho biểu đồ lũy tiến: mốc giờ + mốc hiện tại.
- *
  * Mốc cuối là "bây giờ" nên đường thực tế kết thúc đúng tại hiện tại, không
  * nối thẳng tới cuối ca rồi đứng phẳng — đường đó nói dối là line vẫn chạy.
  */
@@ -230,7 +198,6 @@ export function buildCumulativeSeries({ shift, plannedUph, buckets, currentMinut
       minutes: bucket.hourMinutes,
       label: bucket.label,
       actual,
-      // Target lũy tiến, tức target của giờ đó cộng dồn — không phải target giờ.
       target: round1(
         cumulativeTarget({
           shift,

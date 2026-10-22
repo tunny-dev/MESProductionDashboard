@@ -8,7 +8,6 @@ import { persist } from 'zustand/middleware';
  * @property {string|null} expiresAt    Thời điểm access token hết hạn (ISO).
  * @property {{ id: string, name: string, email?: string|null, type?: string|null }} user
  */
-
 export const useAuthStore = create()(
   persist(
     (set) => ({
@@ -39,7 +38,3 @@ export const useAuthStore = create()(
     }
   )
 );
-
-export function isAuthenticated() {
-  return Boolean(useAuthStore.getState().token);
-}

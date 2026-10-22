@@ -1,22 +1,3 @@
-/**
- * Drill-down từ tab Summary sang tab "Unit S/N List".
- *
- * Ba ô có thể bấm ở Summary, mỗi ô một nguồn dữ liệu và một cách hiển thị
- * khác nhau:
- *
- *   WIP        — SN đã nhập vào chuyền nhưng chưa qua trạm cuối: có serial
- *                thật và có trạm đang kẹt.
- *   NOT_INPUT  — đơn vị theo kế hoạch (MF008) chưa nhập. SFCS sinh serial
- *                lúc quét nhập tại trạm đầu, nên các đơn vị này CHƯA CÓ
- *                serial và chưa qua trạm nào. Hiện "Chưa có SN" / "N/A"
- *                thay vì "—" để không bị đọc nhầm là dữ liệu lỗi.
- *   STATION    — SN đã ĐẠT tại một trạm (cột SMT04/SI08/...). Số dòng khớp
- *                đúng số đang hiện ở ô đã bấm; cột Station cho biết SN đó
- *                đang nằm ở đâu.
- *
- * Đặt ở lib/ (không import React) để hook, tab Summary và tab Unit S/N List
- * cùng đọc một nguồn — đổi nhãn ở đây là đổi cả trang.
- */
 export const DRILL_WIP = 'wip';
 export const DRILL_NOT_INPUT = 'not-input';
 export const DRILL_STATION = 'station';

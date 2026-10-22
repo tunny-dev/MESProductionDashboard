@@ -1,14 +1,15 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+﻿import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import {
-  getWipReport,
-  getWipByStation,
-  getWipUnitSnList,
-  getWipNotInputSnList,
-  getWipStationSnList,
-  getLineOptions,
-  getModelOptions,
-  getMoOptions,
+  getWipSummary,
+  getWipStation,
+  getWipUnitSn,
+  getWipNotInputSn,
+  getWipStationSn,
+  getMfgType,
+  getProductionLine,
+  getWipModels,
+  getWipMos,
 } from '@/features/wip-report/api/wip-report';
 import {
   DRILL_WIP as WIP,
@@ -27,9 +28,10 @@ const queryKeys = {
     line ?? '',
     station ?? '',
   ],
-  lines: (mfgType) => ['wip-report', 'lines', mfgType ?? ''],
+  lines: (deptCode) => ['wip-report', 'lines', deptCode ?? ''],
   models: (mfgType, line) => ['wip-report', 'models', mfgType ?? '', line ?? ''],
   mos: (mfgType, line) => ['wip-report', 'mos', mfgType ?? '', line ?? ''],
+  mfgTypes: () => ['wip-report', 'mfg-types'],
 };
 
 /**
@@ -39,15 +41,12 @@ const queryKeys = {
 export function useWipReport({ params, enabled = false, queryKey: bumpKey = 0 }) {
   return useQuery({
     queryKey: [...queryKeys.report(params), bumpKey],
-    queryFn: () => getWipReport(params),
+    queryFn: () => getWipSummary(params),
     enabled,
     retry: 0,
     staleTime: 0,
-    // Bộ đếm Auto Reload (trong Summary) là nguồn refetch duy nhất — không để
-    // React Query tự refetch khi cửa sổ được focus lại.
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // Giữ trang cũ trong lúc tải trang mới — đổi số trang không nhấp nháy skeleton.
     placeholderData: keepPreviousData,
   });
 }
@@ -59,7 +58,7 @@ export function useWipReport({ params, enabled = false, queryKey: bumpKey = 0 })
 export function useWipByStation({ params, enabled = false, queryKey: bumpKey = 0 }) {
   return useQuery({
     queryKey: [...queryKeys.byStation(params), bumpKey],
-    queryFn: () => getWipByStation(params),
+    queryFn: () => getWipStation(params),
     enabled,
     retry: 0,
     staleTime: 0,
@@ -70,12 +69,6 @@ export function useWipByStation({ params, enabled = false, queryKey: bumpKey = 0
 
 /**
  * Danh sách đơn vị của 1 cặp (MO, chuyền) — tab "Unit S/N List".
- * `source` quyết định gọi API nào:
- *   - WIP       (mặc định): SN đang kẹt giữa các trạm, có serial
- *                thật và có trạm đang kẹt
- *   - NOT_INPUT: đơn vị theo kế hoạch chưa nhập, chưa có SN / chưa qua trạm
- *   - STATION:  SN đã đạt tại một trạm cụ thể, có kèm vị trí hiện tại
- * Chỉ fetch khi `enabled` = true, tức người dùng đã bấm vào ô số ở Summary.
  */
 export function useWipUnitSnList({
   params,
@@ -90,9 +83,9 @@ export function useWipUnitSnList({
     queryKey: [...queryKeys.unitSn(params, mo, line, source, station), bumpKey],
     queryFn: () => {
       const scoped = { ...params, mo, line };
-      if (source === STATION) return getWipStationSnList({ ...scoped, station });
-      if (source === NOT_INPUT) return getWipNotInputSnList(scoped);
-      return getWipUnitSnList(scoped);
+      if (source === STATION) return getWipStationSn({ ...scoped, station });
+      if (source === NOT_INPUT) return getWipNotInputSn(scoped);
+      return getWipUnitSn(scoped);
     },
     enabled: enabled && Boolean(mo) && Boolean(line),
     retry: 0,
@@ -103,13 +96,26 @@ export function useWipUnitSnList({
 }
 
 /**
- * Danh sách Line theo MfgType — tự fetch khi mfgType thay đổi.
+ * Danh sách bộ phận (MFG Type) cho radio của tab Query — sCode `getMfgType`.
+ * `code` (VD: VN001) là giá trị gửi xuống `mfgType` của mọi SP WIP.
  */
-export function useWipLineOptions({ mfgType } = {}) {
+export function useWipMfgTypes() {
   return useQuery({
-    queryKey: queryKeys.lines(mfgType),
-    queryFn: () => getLineOptions({ mfgType }),
-    enabled: Boolean(mfgType),
+    queryKey: queryKeys.mfgTypes(),
+    queryFn: () => getMfgType(),
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * Danh sách Line của một bộ phận — tự fetch khi bộ phận thay đổi.
+ * @param {{ deptCode?: string }} [options] `deptCode` = `SSFDC.DC001` (VD: VN001)
+ */
+export function useWipLineOptions({ deptCode } = {}) {
+  return useQuery({
+    queryKey: queryKeys.lines(deptCode),
+    queryFn: () => getProductionLine({ deptCode }),
+    enabled: Boolean(deptCode),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -120,7 +126,7 @@ export function useWipLineOptions({ mfgType } = {}) {
 export function useWipModelOptions({ mfgType, line } = {}) {
   return useQuery({
     queryKey: queryKeys.models(mfgType, line),
-    queryFn: () => getModelOptions({ mfgType, line }),
+    queryFn: () => getWipModels({ mfgType, line }),
     enabled: Boolean(mfgType),
     staleTime: 5 * 60 * 1000,
   });
@@ -133,7 +139,7 @@ export function useWipMoOptions({ mfgType, line, models } = {}) {
   const modelsKey = Array.isArray(models) ? models.join(',') : (models ?? '');
   return useQuery({
     queryKey: [...queryKeys.mos(mfgType, line), modelsKey],
-    queryFn: () => getMoOptions({ mfgType, line, models }),
+    queryFn: () => getWipMos({ mfgType, line, models }),
     enabled: Boolean(mfgType),
     staleTime: 5 * 60 * 1000,
   });

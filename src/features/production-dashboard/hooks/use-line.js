@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  getLines,
-  getModels,
+  getProductionLine,
+  getModelByLine,
   getMoByLine,
   getMoInfo,
   getMfgByLine,
@@ -11,7 +11,7 @@ import {
 export function useLines(deptCode) {
   return useQuery({
     queryKey: ['production-dashboard', 'lines', deptCode ?? ''],
-    queryFn: () => getLines(deptCode),
+    queryFn: () => getProductionLine(deptCode),
     enabled: Boolean(deptCode),
     staleTime: 1000 * 60 * 5,
     retry: false,
@@ -22,7 +22,7 @@ export function useLines(deptCode) {
 export function useModels(lineId) {
   return useQuery({
     queryKey: ['production-dashboard', 'models', lineId ?? ''],
-    queryFn: () => getModels(lineId),
+    queryFn: () => getModelByLine(lineId),
     enabled: Boolean(lineId),
     staleTime: 1000 * 60 * 5,
     retry: false,
@@ -68,7 +68,7 @@ export function useMfgByLine(lineId) {
     queryKey: ['production-dashboard', 'mfg', lineId ?? ''],
     queryFn: () => getMfgByLine(lineId),
     enabled: Boolean(lineId),
-    staleTime: 1000 * 60 * 30, // 30 phút — thông tin ít thay đổi
+    staleTime: 1000 * 60 * 30,
     retry: false,
   });
 }

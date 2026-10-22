@@ -16,19 +16,18 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import {
+  useWipMfgTypes,
   useWipLineOptions,
   useWipModelOptions,
   useWipMoOptions,
 } from '@/features/wip-report/hooks/use-wip-report';
 import { SimplePagination } from '@/features/wip-report/components/simple-pagination';
 
-const MFG_TYPES = ['SMT', 'DIP', 'FA'];
-
 // Số lựa chọn mỗi trang trong dialog multi-select (Model / Line / MO).
 const DIALOG_PAGE_SIZE = 20;
 
-// Khoảng MO Create Date tối đa cho phép query: 1 tháng (31 ngày, tính bao gồm).
-const MAX_RANGE_DAYS = 31;
+// Khoảng "MO Create Date" tối đa cho phép query: max 30
+const MAX_RANGE_DAYS = 30;
 
 // Mốc hôm nay (00:00) — dùng để chặn chọn ngày tương lai.
 const TODAY_START = (() => {
@@ -37,9 +36,9 @@ const TODAY_START = (() => {
   return d;
 })();
 
-// Mặc định điền sẵn khoảng 1 tháng gần nhất.
+// Mặc định điền sẵn khoảng 1 tháng gần nhất
 const DEFAULT_FORM = {
-  mfgType: 'SMT',
+  mfgType: '',
   moCreateDateFrom: subDays(TODAY_START, MAX_RANGE_DAYS - 1),
   moCreateDateTo: TODAY_START,
   moDays: '',
@@ -53,17 +52,31 @@ export function WipQueryTab({ onQuery }) {
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
 
+  const {
+    data: mfgTypes = [],
+    isLoading: mfgTypesLoading,
+    isError: mfgTypesError,
+  } = useWipMfgTypes();
+
+  const activeType = mfgTypes.find((t) => t.code === form.mfgType) ?? mfgTypes[0] ?? null;
+
   function handleMfgType(type) {
-    setForm((prev) => ({ ...prev, mfgType: type, models: [], lines: [], mos: [] }));
+    setForm((prev) => ({
+      ...prev,
+      mfgType: type.code,
+      models: [],
+      lines: [],
+      mos: [],
+    }));
   }
 
-  const { data: lineOptions = [] } = useWipLineOptions({ mfgType: form.mfgType });
+  const { data: lineOptions = [] } = useWipLineOptions({ deptCode: activeType?.code });
   const { data: modelOptions = [] } = useWipModelOptions({
-    mfgType: form.mfgType,
+    mfgType: activeType?.code,
     line: form.lines.join(','),
   });
   const { data: moOptions = [] } = useWipMoOptions({
-    mfgType: form.mfgType,
+    mfgType: activeType?.code,
     line: form.lines.join(','),
     models: form.models,
   });
@@ -78,19 +91,20 @@ export function WipQueryTab({ onQuery }) {
 
   const canPickDates = Boolean(form.moCreateDateFrom && form.moCreateDateTo);
 
-  // Số ngày bao gồm của khoảng đã chọn (chỉ có ý nghĩa khi đã chọn đủ 2 đầu).
   const rangeDays = canPickDates
     ? differenceInCalendarDays(form.moCreateDateTo, form.moCreateDateFrom) + 1
     : 0;
   const rangeTooLong = rangeDays > MAX_RANGE_DAYS;
   const rangeReversed = canPickDates && rangeDays <= 0;
 
-  const canQuery = canPickDates && !rangeTooLong && !rangeReversed;
+  const canQuery = canPickDates && !rangeTooLong && !rangeReversed && Boolean(activeType?.code);
 
   function handleQuery() {
     if (!canQuery) return;
     onQuery?.({
       ...form,
+      mfgType: activeType?.code,
+      mfgTypeName: activeType?.name,
       line: form.lines.join(','),
       mo: form.mos.join(','),
       model: form.models,
@@ -105,19 +119,33 @@ export function WipQueryTab({ onQuery }) {
     <div className="w-full max-w-2xl">
       <FormRow label="MFG Type" required>
         <div className="flex min-h-8 flex-wrap items-center gap-4">
-          {MFG_TYPES.map((type) => (
-            <label key={type} className="flex cursor-pointer items-center gap-1.5 text-sm">
+          {mfgTypes.map((type) => (
+            <label
+              key={type.code}
+              className="flex cursor-pointer items-center gap-1.5 text-sm"
+              title={`${type.name} — gửi xuống SP: ${type.code}`}
+            >
               <input
                 type="radio"
                 name="mfgType"
-                value={type}
-                checked={form.mfgType === type}
+                value={type.code}
+                checked={activeType?.code === type.code}
                 onChange={() => handleMfgType(type)}
                 className="accent-primary"
               />
-              {type}
+              {type.name}
+              <span className="text-xs text-muted-foreground">({type.code})</span>
             </label>
           ))}
+          {mfgTypes.length === 0 && (
+            <span className="text-xs text-muted-foreground">
+              {mfgTypesLoading
+                ? 'Đang tải bộ phận…'
+                : mfgTypesError
+                  ? 'Không tải được danh sách bộ phận (getMfgType).'
+                  : 'Không có bộ phận nào cho nhà máy này.'}
+            </span>
+          )}
         </div>
       </FormRow>
 
@@ -146,6 +174,10 @@ export function WipQueryTab({ onQuery }) {
             Format: yyyy/mm/dd
           </span>
           <span className="text-xs text-muted-foreground">Max range: {MAX_RANGE_DAYS} days</span>
+          <span className="w-full text-xs text-muted-foreground">
+            Lọc theo ngày tạo MO, hoặc MO có scan trong khoảng (giống màn MES cũ) — chọn 1 ngày vẫn
+            ra hoạt động của ngày đó.
+          </span>
         </div>
       </FormRow>
 
@@ -314,9 +346,6 @@ function MultiSelectDialog({
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState(selected);
 
-  // Dialog nào truyền `columns` thì dùng đúng cột đó (MO: STT · MO · Created
-  // Date). Còn lại: có `numbered` thì thêm cột STT đứng trước, không thì chỉ 1
-  // cột với tiêu đề `columnLabel` (Model / Line).
   const tableColumns =
     columns && columns.length > 0
       ? columns

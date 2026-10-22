@@ -1,15 +1,13 @@
 import { DASHBOARD_CONFIG } from '@/features/production-dashboard/lib/dashboard-config';
+import { toNum } from '@/lib/coerce';
 
 /** Thời gian tối thiểu để UPH của 1 trạm có ý nghĩa — xem `sanitizeStationUph`. */
 const MIN_UPH_SPAN_MIN = 5; // phút
 
 /**
  * Tỷ lệ đạt kế hoạch (%).
- *
- * CHỐNG TRÊN 100%: sản lượng bằng hoặc vượt kế hoạch đều là "đạt", hiển thị
- * 100%. Không chặn thì các ô trạm rất dễ nhảy 176% / 213% / 432% (mẫu thật
- * đã gặp) — người xem tưởng sai số liệu trong khi chỉ là sản lượng dồn về
- * cuối ca.
+ * CHỐNG TRÊN 100%: sản lượng bằng hoặc vượt kế hoạch đều là "đạt",
+ * luôn luôn là 100%
  */
 export function calculateAchievement(actualOutput, planOutput) {
   if (
@@ -25,24 +23,9 @@ export function calculateAchievement(actualOutput, planOutput) {
 }
 
 /**
- * UPH thực tế của 1 trạm, loại bỏ số liệu vô nghĩa.
- *
+ * UPH thực tế của 1 trạm.
  * BE tính `uphActual = outputQty * 3600 / spanSec` với
- * spanSec = (giây) giữa log đầu và log cuối của trạm. Trạm vừa chạy được
- * vài chục giây thì mẫu số gần 0 nên UPH bộc lên hàng nghìn:
- *
- *   VI5-25C0061S / 12-10 / SX01:  2 đơn trong 1 giây   -> 7.200 PCS/H
- *   VI5-25B0184S / 02-10 / SMT06: 20 đơn trong 11 giây -> 6.545 PCS/H
- *   VI5-25C0222S / 28-09 / SMT06: 3 đơn trong 1 giây  -> 10.800 PCS/H
- *
- * Đó không phải năng suất, chỉ là vài lần quét liên tiếp. Quét toàn DB từ
- * 01/09 (2.113 dòng trạm có số liệu) có 240 dòng chạy dưới 5 phút — chiếm
- * 11,4% — và chúng chính là những cột làm vỡ biểu đồ so sánh trạm.
- *
- * NGUYÊN TẮC: dưới 5 phút thì mẫu chưa đủ để ra một tốc độ → trả null, để
- * UI hiện "—" thay vì số bịa. Không cần thêm điều kiện số đơn: một trạm chạy
- * 8 giờ mới có 3 đơn thì UPH rất thấp nhưng đúng thật, vẫn nên hiện.
- *
+ * spanSec = (giây) giữa log đầu và log cuối của trạm.
  * @param {number|null} apiUph UPH do BE tính (dùng khi đủ dữ liệu).
  * @param {number|null} spanMin Khoảng cách phút giữa log đầu và log cuối.
  * @returns {number|null}
@@ -53,34 +36,32 @@ export function sanitizeStationUph(apiUph, spanMin) {
   return Number(apiUph) || null;
 }
 
-/** Tỷ lệ tốt của trạm = số đạt LẦN ĐẦU ÷ số đầu vào (FPY).
- *
- * Vì sao không dùng "đầu ra ÷ đầu vào": hàng bị NG rồi sửa xong vẫn được quét
- * lại và ghi nhận đạt, nên đầu ra gần như không giảm khi NG tăng. Số thật ở
- * VI1-26902300/A101, trạm AT64 (nhập 390, NG 101, đầu ra 389):
- *
- *   đầu ra ÷ đầu vào        = 389 ÷ 390 = 99.74%   ← NG 101 mà vẫn 99.74%, vô nghĩa
- *   đạt lần đầu ÷ đầu vào  = 290 ÷ 390 = 74.36%   ← phản ánh đúng 101 hàng NG
- *
- * Vì sao không dùng "đầu ra ÷ (đầu ra + NG)": con số 101 đó đã sửa và đạt,
- * tính vào mẫu số lần nữa là trừ hai lần.
- *
- * `firstPass` lấy từ cột TA028 = '1' (đã kiểm chứng TA028='2' khớp đúng với
- * số NG ở mọi trạm). Thiếu số này thì lùi về đầu ra ÷ đầu vào.
+/**
+ * Tỷ lệ tốt của trạm = số đạt LẦN ĐẦU ÷ số đầu vào (FPY)
+ * Tỷ lệ chất lượng = First-pass yield (FPY).
+ * FPY = số đạt LẦN ĐẦU (TA028 = '1') ÷ số đầu vào.
  */
 export function calculateYield(firstPass, inputQty, actualOutput) {
+  void actualOutput;
   const input = Number(inputQty);
   if (!Number.isFinite(input) || input <= 0) return null;
 
-  const good =
-    firstPass === null || firstPass === undefined ? Number(actualOutput) : Number(firstPass);
-  if (!Number.isFinite(good)) return null;
+  // firstPass null/undefined = BE chưa trả TA028 → không tính, không fallback.
+  if (firstPass === null || firstPass === undefined) return null;
+  const good = Number(firstPass);
+  if (!Number.isFinite(good) || good < 0 || good > input) return null;
 
   return Math.min((good / input) * 100, 100);
 }
 
-// Dữ liệu WIP do backend trả về luôn được ưu tiên; nếu thiếu thì tính chênh lệch giữa hai trạm.
 export function getStationWip(station, index, stations, summary) {
+  if (
+    station?.stuckQty !== null &&
+    station?.stuckQty !== undefined &&
+    Number.isFinite(Number(station.stuckQty))
+  ) {
+    return Number(station.stuckQty);
+  }
   if (station?.wip !== null && station?.wip !== undefined && Number.isFinite(Number(station.wip))) {
     return Number(station.wip);
   }
@@ -101,7 +82,9 @@ export function getWipLimit(stationConfig) {
   return stationConfig?.wipLimit ?? DASHBOARD_CONFIG.wipLimit;
 }
 
-// Bottleneck là trạm có tỷ lệ Actual UPH / Target UPH thấp nhất, không phải trạm có output thấp nhất.
+/** Bottleneck là trạm có tỷ lệ Actual UPH / Target UPH thấp nhất,
+ * không phải trạm có output thấp nhất.
+ */
 export function findBottleneck(stations) {
   return (
     stations.reduce((lowest, station) => {
@@ -123,14 +106,7 @@ export function parseTaTimestamp(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function toNum(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-// Ngưỡng cho trạng thái trạm — dùng CHUNG ngưỡng với màu % đạt (95 / 90)
-// để cả bảng nói một ngôn ngữ, quản lý không phải nhớ hai bộ tiêu chí.
+/** Ngưỡng cho trạng thái trạm. */
 const STATION_STATUS_THRESHOLD = {
   yieldAbnormal: 95, // tỷ lệ tốt dưới ngưỡng này = bất thường
   slotAbnormal: 90, // % đạt slot vừa kết thúc dưới ngưỡng này = bất thường
@@ -141,21 +117,10 @@ const STATION_STATUS_THRESHOLD = {
   wipMin: 50, // hoặc WIP > 50 món, tuỳ cái nào lớn hơn
 };
 
-/**
- * Trạng thái 1 trạm: RUNNING / WAITING / ABNORMAL / STOP.
- *
- * Thứ tự đánh giá cố ý đặt Dừng trước Bất thường: khi máy không chạy thì
- * nhân viên cần biết "dừng" trước, sửa xong máy mới xét lại chất lượng.
- *
- * @param {object} station  1 dòng đã chuẩn hoá (actualOutput, ngQty, wip, hourlyAchievement…)
- * @param {object} [opts]
- * @param {number} [opts.lastCompletedSlotIndex] index khung vừa kết thúc (-1 = chưa có)
- * @param {boolean} [opts.isCurrentShift] đang xem ca hiện tại thì mới xét "im lặng"
- * @param {Date} [opts.now] mốc so sánh (mặc định đồng hồ thật)
- */
+/** Trạng thái trạm: RUNNING/WAITING/ABNORMAL/STOP. Dừng trước Bất thường. */
 export function getStationStatus(
   station,
-  { lastCompletedSlotIndex = -1, isCurrentShift = false, now = null } = {}
+  { lastCompletedSlotIndex = -1, isCurrentShift = false, now = null, woMode = false } = {}
 ) {
   if (!station) return null;
 
@@ -186,12 +151,12 @@ export function getStationStatus(
   );
 
   // Tín hiệu tốc độ:
-  // - đang xem ca hiện tại → % đạt của khung vừa kết thúc (phản ánh diễn biến)
+  // - đang xem ca hiện tại → % đạt của khung vừa kết thúc
   // - ca đã xong → % đạt cả ca. Không dùng khung cuối vì ca thường kết thúc
   //   không đúng giờ, khung cuối trống sẽ kéo mọi trạm xuống 0% và báo động giả.
   const totalAchv = planOut > 0 ? Math.min((output / planOut) * 100, 100) : null;
   const lastSlotAchv =
-    isCurrentShift && lastCompletedSlotIndex >= 0
+    !woMode && isCurrentShift && lastCompletedSlotIndex >= 0
       ? (station.hourlyAchievement?.[lastCompletedSlotIndex] ?? null)
       : totalAchv;
 
@@ -217,7 +182,6 @@ export function getStationStatus(
   return 'RUNNING';
 }
 
-// Mọi ô tỷ lệ dùng cùng ngưỡng cấu hình để màu không bị lệch giữa KPI, bảng và thanh tiến độ.
 export function getAchievementColor(percent) {
   const value = Number(percent);
   const { green, yellow } = DASHBOARD_CONFIG.achievementThreshold;
@@ -258,27 +222,4 @@ export function getSlotState(slot, clockTime, shift) {
   if (currentMinute < slot.startMinute) return 'future';
   if (currentMinute < slot.endMinute) return 'current';
   return 'complete';
-}
-
-export function formatNumber(value) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(value));
-}
-
-/**
- * Định dạng phần trăm — bỏ chữ ",0" ở cuối cho gọn:
- * 100 → "100%",  99.94 → "99.9%",  74.36 → "74.4%".
- */
-export function formatPercent(value, digits = 1) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '-';
-  const n = Number(value);
-  const rounded = Number(n.toFixed(digits));
-  const isWhole = Math.abs(rounded - Math.round(rounded)) < 1e-9;
-  const text = isWhole
-    ? String(Math.round(rounded))
-    : rounded.toLocaleString('en-US', {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-      });
-  return `${text}%`;
 }

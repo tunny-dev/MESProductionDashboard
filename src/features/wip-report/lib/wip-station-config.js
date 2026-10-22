@@ -1,22 +1,3 @@
-/**
- * Danh sách trạm FIX CỨNG theo công đoạn — cột trạm của trang /wip-report.
- *
- * Sinh từ DB ngày 15/10/2026 (trạm có log từ 01/08, OP sản xuất
- * `MA009 NOT IN ('4','5')`):
- *   SMT  7 trạm · DIP 11 trạm · FA 29 trạm.
- *
- * Mapping khi query: theo MÃ TRẠM (code), không theo model — model 10 trạm
- * hay 13 trạm thì đều fill vào đúng cột của nó, cột nào MO không đi qua
- * hiện '—'. Thứ tự trong mảng chỉ là thứ tự hiển thị, không ảnh hưởng mapping.
- *
- * KHI CÓ TRẠM MỚI: thêm 1 dòng vào mảng tương ứng rồi deploy FE, không cần
- * đụng SQL (API trả theo mã trạm, FE tự map). Muốn lấy lại danh sách từ DB:
- *   SELECT T.TA007, MAX(M.MA015) FROM SSFTA T
- *   LEFT JOIN SSFMA M ON M.MA001 = T.TA007
- *   WHERE T.TA003 >= '<YYYYMMDD>' AND T.TA007 IN
- *     (SELECT MA001 FROM SSFMA WHERE MA009 NOT IN('4','5') AND MA005='<H001|H002|H003>')
- *   GROUP BY T.TA007 ORDER BY T.TA007
- */
 export const WIP_STATIONS_BY_PROCESS = {
   SMT: [
     { code: 'SMT04', name: 'SMT bottom parts control' },

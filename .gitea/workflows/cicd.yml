@@ -1,0 +1,407 @@
+name: MES Production Dashboard CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: mes-dashboard-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: powershell
+
+    env:
+      # CẤU HÌNH TÊN SITE TRÊN IIS (Cần khớp với tên site bạn đã tạo trên IIS)
+      SITE_NAME: MES_Dashboard
+      DEPLOY_ROOT: D:\Senao\MESProductionDashboard
+      PUBLISH_DIR: D:\Senao\CI\MESProductionDashboard\publish
+      RELEASES_DIR: D:\Senao\MESProductionDashboard\releases
+      BACKUP_ROOT: D:\Senao\MESProductionDashboard\backup
+      KEEP_RELEASES: 5
+      KEEP_BACKUPS: 10
+      # Thư mục output mặc định của React (Create React App là 'build', Vite là 'dist')
+      REACT_BUILD_DIR: build
+
+    steps:
+      - name: Clear act cache
+        run: |
+          $actCache = "C:\Windows\system32\config\systemprofile\.cache\act"
+          if (Test-Path $actCache) {
+            Write-Host "Removing act cache $actCache"
+            Remove-Item $actCache -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Checkout
+        # LƯU Ý: Thay đổi đường dẫn repo này trỏ đến repo React của bạn
+        uses: https://10.1.200.200:83/K00136/ci-actions-checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          clean: true
+          persist-credentials: false
+
+      - name: Verify checkout integrity
+        run: |
+          $status = git status --porcelain
+          if ($status) {
+            throw "Checkout is not clean: $status"
+          }
+          $sha = (git rev-parse HEAD).Trim()
+          if ([string]::IsNullOrWhiteSpace($sha)) {
+            throw "Cannot resolve HEAD commit."
+          }
+          Write-Host "Verified clean checkout at $sha"
+
+      - name: Check Node.js and npm
+        run: |
+          node --version
+          npm --version
+
+      - name: Install dependencies
+        run: |
+          # Dùng npm ci để đảm bảo cài đặt chính xác theo package-lock.json, nhanh và an toàn hơn npm install
+          npm ci
+
+      - name: Build React App
+        run: |
+          npm run build
+
+      - name: Publish / Stage Artifact
+        run: |
+          if (Test-Path $env:PUBLISH_DIR) {
+              Remove-Item $env:PUBLISH_DIR -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force $env:PUBLISH_DIR | Out-Null
+
+          # Copy toàn bộ nội dung thư mục build (hoặc dist) vào thư mục publish
+          $buildOutput = Join-Path $PWD $env:REACT_BUILD_DIR
+          if (!(Test-Path $buildOutput)) {
+              throw "Build output directory '$buildOutput' not found. Check your React build config."
+          }
+          
+          Copy-Item "$buildOutput\*" $env:PUBLISH_DIR -Recurse -Force
+          Write-Host "Artifacts copied to $env:PUBLISH_DIR"
+
+      - name: Stamp release version
+        run: |
+          $sha = (git rev-parse HEAD).Trim()
+          $short = (git rev-parse --short HEAD).Trim()
+          $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+          $releaseName = "${stamp}_${short}"
+          $versionContent = "commit=$sha`r`nbuilt=$stamp`r`n"
+          
+          Set-Content -Path (Join-Path $env:PUBLISH_DIR "version.txt") -Value $versionContent -Encoding utf8
+          Set-Content -Path "ci_release_name.txt" -Value $releaseName -Encoding utf8 -NoNewline
+          Write-Host "Release: $releaseName ($sha)"
+
+      - name: Validate publish artifact
+        run: |
+          $requiredFiles = @("index.html", "version.txt")
+          foreach ($f in $requiredFiles) {
+              $p = Join-Path $env:PUBLISH_DIR $f
+              if (!(Test-Path $p)) {
+                  throw "Publish artifact missing: $f"
+              }
+          }
+          # Kiểm tra thư mục static/assets (tuỳ thuộc vào tool bạn dùng: CRA là 'static', Vite là 'assets')
+          $staticDir = Join-Path $env:PUBLISH_DIR "static"
+          $assetsDir = Join-Path $env:PUBLISH_DIR "assets"
+          if (!(Test-Path $staticDir) -and !(Test-Path $assetsDir)) {
+              throw "Publish artifact missing: 'static' or 'assets' directory"
+          }
+          Write-Host "Publish artifact validated."
+
+      - name: Backup current release
+        run: |
+          Import-Module WebAdministration
+
+          $site = Get-Website -Name $env:SITE_NAME
+          $currentPath = ($site.physicalPath).Trim()
+          if ([string]::IsNullOrWhiteSpace($currentPath)) {
+              throw "Cannot resolve physical path of site $env:SITE_NAME"
+          }
+          Set-Content -Path "ci_previous_path.txt" -Value $currentPath -Encoding utf8 -NoNewline
+
+          $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+          $backupPath = Join-Path $env:BACKUP_ROOT $timestamp
+          New-Item -ItemType Directory -Force $backupPath | Out-Null
+
+          # Backup toàn bộ, trừ file app_offline.htm nếu có
+          Get-ChildItem -Path $currentPath -Force |
+              Where-Object { $_.Name -ne "app_offline.htm" } |
+              Copy-Item -Destination $backupPath -Recurse -Force
+
+          $rollback = [ordered]@{
+              previousPhysicalPath = $currentPath
+              backupPath = $backupPath
+              commit = ((git rev-parse HEAD).Trim())
+              created = $timestamp
+          }
+          $rollback | ConvertTo-Json | Set-Content -Path (Join-Path $backupPath "rollback.json") -Encoding utf8
+
+          Write-Host "Backup created: $backupPath"
+
+      - name: Stop IIS
+        run: |
+          Import-Module WebAdministration
+
+          $site = Get-Website -Name $env:SITE_NAME
+          $appPool = $site.applicationPool
+          $currentPath = (Get-Content "ci_previous_path.txt").Trim()
+
+          $siteState = (Get-Website -Name $env:SITE_NAME).State
+          $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+          Write-Host "Website state: $siteState"
+          Write-Host "Application Pool state: $poolState"
+
+          if ($siteState -ne "Stopped") {
+              Write-Host "Stopping website: $env:SITE_NAME"
+              Stop-Website -Name $env:SITE_NAME
+          }
+
+          if ($poolState -ne "Stopped") {
+              Write-Host "Stopping application pool: $appPool"
+              Stop-WebAppPool -Name $appPool
+          }
+
+          # Tạo file app_offline.htm để chặn request nếu IIS chưa kịp stop hoàn toàn (cần cấu hình URL Rewrite trên IIS nếu muốn nó hoạt động với static site)
+          Write-Host "Creating app_offline.htm in current release"
+          New-Item -ItemType File -Force (Join-Path $currentPath "app_offline.htm") | Out-Null
+
+          Write-Host "Waiting for IIS to release file locks..."
+          Start-Sleep -Seconds 10
+
+          $pool = Get-WebAppPoolState -Name $appPool
+          if ($pool.Value -ne "Stopped") {
+              throw "Application Pool $appPool failed to stop."
+          }
+
+      - name: Stage versioned release
+        run: |
+          Import-Module WebAdministration
+
+          $releaseName = (Get-Content "ci_release_name.txt").Trim()
+          $releasePath = Join-Path $env:RELEASES_DIR $releaseName
+          if (Test-Path $releasePath) {
+              throw "Release directory already exists: $releasePath"
+          }
+
+          New-Item -ItemType Directory -Force $releasePath | Out-Null
+          Copy-Item "$($env:PUBLISH_DIR)\*" $releasePath -Recurse -Force
+
+          # CẤP QUYỀN CHO IIS APPPOOL
+          # Lưu ý: React là static file, chỉ cần quyền Read & Execute (RX), KHÔNG cần Modify (M) để tăng bảo mật
+          $appPool = (Get-Website -Name $env:SITE_NAME).applicationPool
+          $aclUser = "IIS AppPool\$appPool"
+          Write-Host "Granting Read & Execute permissions to $aclUser on $releasePath"
+          & icacls $releasePath /grant "${aclUser}:(OI)(CI)RX" /T | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+              throw "Failed to grant log write permission to AppPool $appPool"
+          }
+
+          Set-Content -Path "ci_release_path.txt" -Value $releasePath -Encoding utf8 -NoNewline
+          Write-Host "Release staged: $releasePath"
+
+      - name: Switch traffic and start IIS
+        run: |
+          Import-Module WebAdministration
+
+          $siteName = $env:SITE_NAME
+          $releasePath = (Get-Content "ci_release_path.txt").Trim()
+          $site = Get-Website -Name $siteName
+          $appPool = $site.applicationPool
+
+          Write-Host "Switching $siteName to $releasePath"
+          Set-ItemProperty "IIS:\Sites\$siteName" -Name physicalPath -Value $releasePath
+
+          $offline = Join-Path $releasePath "app_offline.htm"
+          if (Test-Path $offline) {
+              Remove-Item $offline -Force
+          }
+
+          Write-Host "Starting Application Pool: $appPool"
+          Start-WebAppPool -Name $appPool
+          Start-Sleep -Seconds 5
+
+          $poolState = (Get-WebAppPoolState -Name $appPool).Value
+          if ($poolState -ne "Started") {
+              throw "Application Pool $appPool failed to start."
+          }
+
+          Write-Host "Starting Website: $siteName"
+          Start-Website -Name $siteName
+
+          $siteState = (Get-Website -Name $siteName).State
+          if ($siteState -ne "Started") {
+              throw "$siteName failed to start."
+          }
+
+      - name: Smoke test and auto-rollback
+        run: |
+          Import-Module WebAdministration
+
+          $siteName = $env:SITE_NAME
+          $releasePath = (Get-Content "ci_release_path.txt").Trim()
+          $previousPath = (Get-Content "ci_previous_path.txt").Trim()
+          $appPool = (Get-Website -Name $siteName).applicationPool
+
+          function Get-SmokeTarget {
+              $bindings = @(Get-WebBinding -Name $siteName)
+              if ($bindings.Count -eq 0) {
+                  throw "No bindings found for $siteName"
+              }
+              $preferred = $bindings |
+                  Where-Object { $_.bindingInformation -match '^[^:]*:[0-9]+:$' } |
+                  Sort-Object { if ($_.protocol -eq "http") { 0 } else { 1 } } |
+                  Select-Object -First 1
+          
+              if (-not $preferred) {
+                  $preferred = $bindings |
+                      Sort-Object { if ($_.protocol -eq "http") { 0 } else { 1 } } |
+                      Select-Object -First 1
+              }
+          
+              $parts = $preferred.bindingInformation.Split(":")
+              $ip = $parts[0]
+              $port = $parts[1]
+              $hostHeader = $parts[2]
+          
+              if ([string]::IsNullOrWhiteSpace($ip) -or $ip -eq "*" -or $ip -eq "0.0.0.0") {
+                  $ip = "localhost"
+              }
+              $hostPart = $hostHeader
+              if ([string]::IsNullOrWhiteSpace($hostPart) -or $hostPart -eq "*") {
+                  $hostPart = $ip
+              }
+          
+              # LƯU Ý: Thay đổi path '/' thành path mặc định của dashboard nếu cần (ví dụ: '/dashboard')
+              $url = "$($preferred.protocol)://${hostPart}:${port}/"
+              return @{ Url = $url; SkipCert = ($preferred.protocol -eq "https") }
+          }
+
+          function Invoke-Rollback($reason) {
+              Write-Host "Rolling back to $previousPath. Reason: $reason"
+              Stop-Website -Name $siteName -ErrorAction SilentlyContinue
+              Stop-WebAppPool -Name $appPool -ErrorAction SilentlyContinue
+          
+              Set-ItemProperty "IIS:\Sites\$siteName" -Name physicalPath -Value $previousPath
+          
+              $offline = Join-Path $previousPath "app_offline.htm"
+              if (Test-Path $offline) {
+                  Remove-Item $offline -Force
+              }
+          
+              Start-WebAppPool -Name $appPool
+              Start-Sleep -Seconds 5
+              Start-Website -Name $siteName
+          
+              $state = (Get-Website -Name $siteName).State
+              if ($state -ne "Started") {
+                  throw "Rollback site did not start. Manual intervention required."
+              }
+              Write-Host "Rolled back successfully."
+          }
+
+          $target = Get-SmokeTarget
+          Write-Host "Smoke testing $($target.Url)"
+
+          $ok = $false
+          for ($i = 1; $i -le 18; $i++) {
+              try {
+                  if ($target.SkipCert) {
+                      $code = (curl.exe -sS -k -o NUL -w "%{http_code}" $target.Url).Trim()
+                  }
+                  else {
+                      $resp = Invoke-WebRequest -Uri $target.Url -UseBasicParsing -TimeoutSec 30
+                      $code = [string][int]$resp.StatusCode
+                  }
+                  Write-Host "Attempt ${i}: HTTP $code"
+                  if ($code -eq "200") {
+                      $ok = $true
+                      break
+                  }
+              }
+              catch {
+                  Write-Host "Attempt ${i} failed: $($_.Exception.Message)"
+              }
+              Start-Sleep -Seconds 10
+          }
+
+          if (-not $ok) {
+              try {
+                  Invoke-Rollback "smoke test did not return HTTP 200"
+              }
+              catch {
+                  throw "Smoke test FAILED and rollback also failed: $($_.Exception.Message)"
+              }
+              throw "Smoke test FAILED. Deployment rolled back to previous release."
+          }
+
+          $oldOffline = Join-Path $previousPath "app_offline.htm"
+          if (Test-Path $oldOffline) {
+              Remove-Item $oldOffline -Force
+          }
+          Write-Host "Smoke test passed."
+
+      - name: Prune old releases and backups
+        run: |
+          Import-Module WebAdministration
+
+          $active = ((Get-Website -Name $env:SITE_NAME).physicalPath).Trim()
+
+          $keepR = [int]$env:KEEP_RELEASES
+          $releases = Get-ChildItem -Path $env:RELEASES_DIR -Directory | Sort-Object Name -Descending
+          $staleReleases = @($releases | Select-Object -Skip $keepR | Where-Object { $_.FullName -ne $active })
+          
+          foreach ($d in $staleReleases) {
+              Remove-Item $d.FullName -Recurse -Force
+              Write-Host "Pruned release: $($d.Name)"
+          }
+
+          $keepB = [int]$env:KEEP_BACKUPS
+          $staleBackups = @(Get-ChildItem -Path $env:BACKUP_ROOT -Directory | Sort-Object Name -Descending | Select-Object -Skip $keepB)
+          
+          foreach ($d in $staleBackups) {
+              Remove-Item $d.FullName -Recurse -Force
+              Write-Host "Pruned backup: $($d.Name)"
+          }
+
+      - name: Verify deployment
+        run: |
+          Import-Module WebAdministration
+
+          $site = Get-Website -Name $env:SITE_NAME
+          $appPool = $site.applicationPool
+          $pool = Get-WebAppPoolState -Name $appPool
+          $activePath = ($site.physicalPath).Trim()
+
+          Write-Host "Website: $($site.State)"
+          Write-Host "Application Pool: $($pool.Value)"
+          Write-Host "Physical Path: $activePath"
+
+          if ($site.State -ne "Started") {
+              throw "$env:SITE_NAME is not Started."
+          }
+
+          if ($pool.Value -ne "Started") {
+              throw "Application Pool $appPool is not Started."
+          }
+
+          if (!(Test-Path (Join-Path $activePath "index.html"))) {
+              throw "index.html not found in active release."
+          }
+
+          $versionFile = Join-Path $activePath "version.txt"
+          if (!(Test-Path $versionFile)) {
+              throw "version.txt not found in active release."
+          }
+          Write-Host (Get-Content $versionFile | Out-String)
+
+          Write-Host "Deployment successful."

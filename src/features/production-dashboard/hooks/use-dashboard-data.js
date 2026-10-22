@@ -1,17 +1,8 @@
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
 
-import { ENDPOINTS } from '@/config/api';
+import { DASHBOARD_PARTS, getPart } from '@/features/production-dashboard/api/dashboard-parts';
 import {
-  getMoSummaryPart,
-  getWipReportPart,
-  getChartOutputPart,
-  getChartUphPart,
-  getFlowPart,
-} from '@/features/production-dashboard/api/dashboard-parts';
-import {
-  SHIFT_CODES,
-  getDeptCode,
   mergeDashboardData,
   normalizeFlowRows,
   normalizeMoSummaryRows,
@@ -22,14 +13,34 @@ import {
   DASHBOARD_CONFIG,
   getActiveSlots,
 } from '@/features/production-dashboard/lib/dashboard-config';
+import { SHIFT_CODES } from '@/config/mes-codes';
 
 const REFRESH_MS = DASHBOARD_CONFIG.refreshIntervalSec * 1000;
 const PREVIEW_ROWS = 5;
 
+/** Khoá cache của 1 nguồn (gồm `scope` để tránh dùng lại flow cũ). */
+function partQueryKey(part, { mo, lineId, dateStr, dept, shiftCode, model, scopeCode }) {
+  return [
+    'production-dashboard',
+    'part',
+    part.key,
+    mo,
+    lineId,
+    dateStr,
+    dept,
+    shiftCode,
+    ...(part.usesModel ? [model] : []),
+    scopeCode,
+  ];
+}
+
 /**
  * @param {object} args
  * @param {string|null} args.lineId Mã chuyền (từ ?line=).
- * @param {string|null} args.group Công đoạn ('SMT' | 'DIP' | 'FA') — để tính DEPT.
+ * @param {string|null} args.dept MÃ BỘ PHẬN (`SSFDC.DC001` = `CMSMD.MD004`, VD VN001) — lấy từ
+ *   `getMfgType`/`getMfgByLine` ở trang, gửi thẳng xuống SP `dept`.
+ * @param {string|null} args.process TÊN công đoạn ('SMT' | 'DIP' | 'FA') — chỉ để HIỂN THỊ/tra
+ *   bảng UPH mục tiêu ở FE, KHÔNG gửi xuống SP.
  * @param {string} args.model Model đang chọn ('ALL' = tất cả).
  * @param {string|null} args.mo WO đang chọn — để tải flow (null khi ALL).
  * @param {string} args.date Ngày 'yyyy-MM-dd'.
@@ -38,7 +49,8 @@ const PREVIEW_ROWS = 5;
  */
 export function useDashboardData({
   lineId,
-  group,
+  dept = null,
+  process = null,
   model = 'ALL',
   mo = null,
   date,
@@ -47,111 +59,54 @@ export function useDashboardData({
   enabled = false,
 } = {}) {
   const dateStr = typeof date === 'string' ? date.replace(/-/g, '') : '';
-  const dept = group ? getDeptCode(group) : null;
   const shiftCode = SHIFT_CODES[shift] || '1';
-  const scopeCode = scope === 'WO' ? 'WO' : 'DAY';
-  const ready = Boolean(enabled && lineId && dateStr && shift && dept);
-  const flowReady = ready && Boolean(mo);
-  const args = { dateStr, dept, shift: shiftCode, lineId, mo, model, scope: scopeCode };
 
-  const [moSummaryQ, wipQ, hourlyQ, uphQ, flowQ] = useQueries({
-    queries: [
-      {
-        queryKey: [
-          'production-dashboard',
-          'part',
-          'moSummary',
-          mo,
-          lineId,
-          dateStr,
-          dept,
-          shiftCode,
-          scopeCode,
-        ],
-        queryFn: () => getMoSummaryPart(args),
-        enabled: flowReady,
-        retry: false,
-        refetchInterval: REFRESH_MS,
-        refetchOnWindowFocus: false,
-      },
-      {
-        queryKey: [
-          'production-dashboard',
-          'part',
-          'wipReport',
-          mo,
-          lineId,
-          dateStr,
-          dept,
-          shiftCode,
-          model,
-          scopeCode,
-        ],
-        queryFn: () => getWipReportPart(args),
-        enabled: flowReady,
-        retry: false,
-        refetchInterval: REFRESH_MS,
-        refetchOnWindowFocus: false,
-      },
-      {
-        queryKey: [
-          'production-dashboard',
-          'part',
-          'chartOutput',
-          mo,
-          lineId,
-          dateStr,
-          dept,
-          shiftCode,
-          model,
-          scopeCode,
-        ],
-        queryFn: () => getChartOutputPart(args),
-        enabled: flowReady,
-        retry: false,
-        refetchInterval: REFRESH_MS,
-        refetchOnWindowFocus: false,
-      },
-      {
-        queryKey: [
-          'production-dashboard',
-          'part',
-          'chartUph',
-          mo,
-          lineId,
-          dateStr,
-          dept,
-          shiftCode,
-          model,
-          scopeCode,
-        ],
-        queryFn: () => getChartUphPart(args),
-        enabled: flowReady,
-        retry: false,
-        refetchInterval: REFRESH_MS,
-        refetchOnWindowFocus: false,
-      },
-      {
-        queryKey: ['production-dashboard', 'part', 'flow', mo, lineId, dateStr, dept, shiftCode],
-        queryFn: () => getFlowPart(args),
-        enabled: flowReady,
-        retry: false,
-        refetchInterval: REFRESH_MS,
-        refetchOnWindowFocus: false,
-      },
-    ],
+  const routing = scope === 'ROUTING';
+  const scopeCode = routing ? 'ROUTING' : scope === 'WO' ? 'WO' : 'DAY';
+  const queryLine = routing ? '' : lineId;
+  const queryDept = routing ? '' : dept;
+
+  // Routing không phụ thuộc chuyền đang chọn — chỉ cần WO + ngày + ca.
+  const ready = Boolean(enabled && dateStr && shift && (routing ? lineId && mo : lineId && dept));
+  const flowReady = ready && Boolean(mo);
+  const args = {
+    dateStr,
+    dept: queryDept,
+    shift: shiftCode,
+    lineId: queryLine,
+    mo,
+    model,
+    scope: scopeCode,
+  };
+
+  // Thứ tự query = thứ tự trong DASHBOARD_PARTS .
+  const queries = useQueries({
+    queries: DASHBOARD_PARTS.map((part) => ({
+      queryKey: partQueryKey(part, {
+        mo,
+        lineId: queryLine,
+        dateStr,
+        dept: queryDept,
+        shiftCode,
+        model,
+        scopeCode,
+      }),
+      queryFn: () => getPart(part.key, args),
+      enabled: flowReady,
+      retry: 1,
+      retryDelay: 800,
+      refetchInterval: REFRESH_MS,
+      refetchOnWindowFocus: false,
+    })),
   });
 
+  const [moSummaryQ, wipQ, hourlyQ, uphQ, flowQ, cycleTimeQ] = queries;
+
   const parts = useMemo(
-    () => [
-      toPartView('moSummary', 'Tổng nhập/xuất WO', moSummaryQ, () => argsFor('moSummary', args)),
-      toPartView('wipReport', 'WIP report trạm', wipQ, () => argsFor('wipReport', args)),
-      toPartView('hourly', 'Biểu đồ output & đạt kế hoạch', hourlyQ, () =>
-        argsFor('chartOutput', args)
+    () =>
+      DASHBOARD_PARTS.map((part, index) =>
+        toPartView(part, queries[index], part.buildParams(args))
       ),
-      toPartView('uphTrend', 'Biểu đồ xu hướng UPH', uphQ, () => argsFor('chartUph', args)),
-      toPartView('flow', 'Quy trình theo WO', flowQ, () => argsFor('flow', args)),
-    ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       moSummaryQ.data,
@@ -193,12 +148,12 @@ export function useDashboardData({
   const slots = useMemo(() => {
     const summary = normalizeMoSummaryRows(moSummaryQ.data?.rows);
     return getActiveSlots({
-      scope: scopeCode,
+      scope: routing ? 'WO' : scopeCode,
       shift: DASHBOARD_CONFIG.shifts.find((item) => item.id === shift),
       woStartDate: summary?.woStartDate,
       woDayCount: summary?.woDayCount,
     });
-  }, [scopeCode, shift, moSummaryQ.data]);
+  }, [scopeCode, routing, shift, moSummaryQ.data]);
 
   const data = useMemo(() => {
     if (!wipQ.data && !moSummaryQ.data) return null;
@@ -209,7 +164,7 @@ export function useDashboardData({
         chartUphRows: uphQ.data?.rows ?? [],
         slots,
         fallbackTargetUph: getTargetUph({
-          process: group,
+          process,
           line: lineId,
           op: stations.at(-1)?.stationId,
         }),
@@ -235,18 +190,17 @@ export function useDashboardData({
     uphQ.data,
     uphQ.error,
     model,
-    group,
+    process,
     lineId,
     slots,
   ]);
-
-  const queries = [moSummaryQ, wipQ, hourlyQ, uphQ, flowQ];
 
   return {
     parts,
     flowStations,
     data,
     slots,
+    cycleTime: cycleTimeQ.data ? (cycleTimeQ.data.rows ?? []) : [],
     scope: scopeCode,
     isLoading: wipQ.isLoading || moSummaryQ.isLoading,
     isFetching: queries.some((q) => q.isFetching),
@@ -257,56 +211,26 @@ export function useDashboardData({
   };
 }
 
-function argsFor(key, args) {
-  const base = {
-    sDate: args.dateStr,
-    mo: args.mo,
-    line: args.lineId,
-    dept: args.dept,
-    shift: args.shift,
-  };
-  const withModel = { ...base, model: args.model };
-  const scope = args.scope === 'WO' ? { scope: 'WO' } : {};
-
-  switch (key) {
-    case 'chartOutput':
-    case 'chartUph':
-    case 'wipReport':
-      return { ...withModel, ...scope };
-    case 'moSummary':
-      return { ...base, ...scope };
-    case 'flow':
-      return base;
-    default:
-      return base;
-  }
-}
-
-const PART_ENDPOINTS = () => ({
-  moSummary: ENDPOINTS.production.moSummary,
-  wipReport: ENDPOINTS.production.wipReport,
-  hourly: ENDPOINTS.production.achievement,
-  uphTrend: ENDPOINTS.production.uphTrend,
-  flow: ENDPOINTS.production.flowByMo,
-});
-
-function toPartView(key, label, query, getArgs) {
+/**
+ * View cho panel debug `?debug=1`. `endpoint`/`params` lấy từ chính response đã
+ * gọi (không dựng lại), nên không thể lệch với request thật.
+ */
+function toPartView(part, query, params) {
   const payload = query.data;
-  const params = payload?.params ?? getArgs();
   const rows = payload?.rows ?? [];
   const status =
     !query.isFetched && !query.isFetching && !query.error
       ? 'idle'
       : query.error
         ? 'error'
-        : query.data
+        : payload
           ? 'success'
           : 'loading';
   return {
-    key,
-    label,
-    endpoint: payload?.endpoint ?? PART_ENDPOINTS()[key],
-    params,
+    key: part.key,
+    label: part.label,
+    endpoint: payload?.endpoint ?? part.sCode,
+    params: payload?.params ?? params,
     status,
     isFetching: query.isFetching,
     rowCount: rows.length,

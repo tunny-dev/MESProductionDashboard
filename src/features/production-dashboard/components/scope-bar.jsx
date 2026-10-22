@@ -1,12 +1,9 @@
 import { memo } from 'react';
-import { CalendarRange } from 'lucide-react';
+import { CalendarRange, Waypoints } from 'lucide-react';
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import {
-  calculateAchievement,
-  formatNumber,
-  formatPercent,
-} from '@/features/production-dashboard/lib/calc';
+import { calculateAchievement } from '@/features/production-dashboard/lib/calc';
+import { formatNumber, formatPercent } from '@/lib/format';
 
 /** 'yyyyMMdd' → 'dd/MM'. */
 function formatYmdShort(value) {
@@ -15,23 +12,7 @@ function formatYmdShort(value) {
   return `${s.slice(6, 8)}/${s.slice(4, 6)}`;
 }
 
-/**
- * Dải "chế độ xem" — tách khỏi hàng bộ lọc.
- *
- * VÌ SAO KHÔNG ĐỂ TRONG HEADER:
- * Header trả lời "chuyền nào, ngày nào, ca nào, WO nào" — đều là BỘ LỌC, đều
- * thu hẹp tập dữ liệu. "Ca này / Cả WO" thì không thu hẹp gì cả, nó chỉ đổi
- * CỬA SỔ đang nhìn trên cùng một tập dữ liệu (6 khung 2 giờ của ca ↔ 6 nhóm
- * ngày của cả WO). Nhồi nó vào hàng bộ lọc thì hoặc thành cột thứ 7 chẳng
- * nói lý do, hoặc phải nhồi vào ô "Ca làm việc" — mà ca thì đúng 2 ca, nhồi
- * "Toàn bộ WO" vào là lệch nghĩa.
- *
- * VÌ SAO ĐẶT TRÊN HÀNG THẺ KPI:
- * Nó nằm ngay trên thứ đổi rõ nhất (4 thẻ KPI + bảng trạm + 3 biểu đồ), và
- * không tốn chiều cao của hàng bộ lọc vốn đã chật. Dải này cũng mang theo
- * khoảng ngày thật của WO — thứ giải thích ngay tại sao ở chế độ "Ca này" mà
- * tỷ lệ đạt lại thấp.
- */
+/** Dải "chế độ xem" — tách khỏi hàng bộ lọc (chỉ đổi cửa sổ nhìn, không thu hẹp dữ liệu). */
 export const ScopeBar = memo(function ScopeBar({ scope, onScopeChange, summary, copy }) {
   const span =
     summary?.woStartDate && summary?.woEndDate && summary?.woDayCount
@@ -42,14 +23,14 @@ export const ScopeBar = memo(function ScopeBar({ scope, onScopeChange, summary, 
         )
       : null;
   const days = Number(summary?.woDayCount) || 0;
-  // WO chạy nhiều ngày thì "Ca này" không so được với MF008 (74% WO chạy từ
-  // 2 ngày trở lên) — nhắc ngay, không phải đợi người xem tự nhận ra.
   const multiDay = scope === 'DAY' && days > 1;
 
   const items = [
     { id: 'DAY', label: copy.scopeBar.day, hint: copy.scopeBar.dayHint },
     { id: 'WO', label: copy.scopeBar.wo, hint: copy.scopeBar.woHint },
+    { id: 'ROUTING', label: copy.scopeBar.routing, hint: copy.scopeBar.routingHint },
   ];
+  const woLike = scope === 'WO' || scope === 'ROUTING';
 
   return (
     <div
@@ -92,15 +73,29 @@ export const ScopeBar = memo(function ScopeBar({ scope, onScopeChange, summary, 
       {span ? (
         <p className="flex min-w-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
           <span className="truncate">{span}</span>
-          {scope === 'WO' ? (
-            <span className="shrink-0 text-foreground">
-              {copy.woProgress.of(
-                formatNumber(summary.totalOutput),
-                formatNumber(summary.planOutput)
-              )}
-              {formatPercent(calculateAchievement(summary.totalOutput, summary.planOutput), 1)}
-            </span>
+          {woLike ? (
+            <>
+              <span className="shrink-0 text-foreground">
+                {copy.woProgress.of(
+                  formatNumber(summary.totalOutput),
+                  formatNumber(summary.planOutput)
+                )}
+              </span>
+              <span className="shrink-0 font-semibold text-foreground">
+                {formatPercent(calculateAchievement(summary.totalOutput, summary.planOutput), 1)}
+              </span>
+            </>
           ) : null}
+        </p>
+      ) : null}
+
+      {scope === 'ROUTING' ? (
+        <p
+          title={copy.scopeBar.routingNote}
+          className="flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium text-production-blue"
+        >
+          <Waypoints className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{copy.scopeBar.routingNote}</span>
         </p>
       ) : null}
 

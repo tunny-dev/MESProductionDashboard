@@ -4,18 +4,25 @@ import { ArrowRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
-  formatNumber,
   getStatusTone,
   getStationWip,
   getWipLimit,
 } from '@/features/production-dashboard/lib/calc';
+import { formatNumber } from '@/lib/format';
 
 function statusLabel(status, copy) {
   return copy.status[status] || copy.status.UNKNOWN;
 }
 
-const FLOW_STATION_MIN_WIDTH = 100;
-const FLOW_STATION_GAP = 12;
+const FLOW_STATION_MIN_WIDTH = 118;
+const FLOW_STATION_GAP = 14;
+
+const STATUS_ACCENT = {
+  RUNNING: 'border-l-success',
+  WAITING: 'border-l-warning',
+  ABNORMAL: 'border-l-danger',
+  STOP: 'border-l-neutral',
+};
 
 export const FlowStrip = memo(function FlowStrip({
   lineConfig,
@@ -34,9 +41,9 @@ export const FlowStrip = memo(function FlowStrip({
   return (
     <section
       aria-label={copy.flow.title(lineConfig.type)}
-      className="flex min-h-[72px] items-stretch gap-2 overflow-hidden rounded-xl border border-border bg-card/80 p-2"
+      className="flex min-h-21 items-stretch gap-2 overflow-hidden rounded-xl border border-border bg-card/80 p-2"
     >
-      <div className="flex w-[82px] shrink-0 items-center justify-center rounded-lg border border-production-blue/45 bg-production-blue/10 px-2 text-center text-xs font-semibold leading-tight text-foreground 2xl:w-[96px] 2xl:text-sm">
+      <div className="flex w-20.5 shrink-0 items-center justify-center rounded-lg border border-production-blue/45 bg-production-blue/10 px-2 text-center text-[11px] font-bold uppercase leading-tight tracking-wide text-foreground 2xl:w-24 2xl:text-xs">
         {copy.flow.title(lineConfig.type)}
       </div>
 
@@ -61,28 +68,25 @@ export const FlowStrip = memo(function FlowStrip({
               qty !== null && qty !== undefined && Number.isFinite(Number(qty))
                 ? `${copy.flow.qty} ${formatNumber(qty)}`
                 : null;
-            // Thẻ nào đang đỏ (vượt ngưỡng WIP, hoặc là bottleneck) thì tô nền
-            // đỏ đặc + chữ trắng và phát sáng nhấp nháy: trên TV người ta không
-            // đọc chữ, chỉ nhận ra vùng đang nổi bật.
             const isAlert = isWipOver || isBottleneck;
 
-            // Tooltip gom hết thông tin của thẻ vào một chỗ: tên công đoạn,
-            // trạng thái, WIP và ngưỡng cảnh báo. Trước đây phần cảnh báo WIP là
-            // một huy hiệu riêng nằm trong thẻ, chiếm chỗ và phải rê chuột vào
-            // đúng huy hiệu mới đọc được. Mỗi dòng mang cờ riêng để tô đúng chỗ
-            // thay vì đoán vị trí theo chỉ số.
             const tooltipRows = [
               { text: `${stationConfig.id} · ${stationConfig.name}`, emphasis: 'title' },
               { text: statusLabel(status, copy), emphasis: null },
               ...(qtyText ? [{ text: qtyText, emphasis: null }] : []),
+              ...(Number.isFinite(Number(station.actualUph))
+                ? [
+                    {
+                      text: `${copy.table.actualUph}: ${formatNumber(station.actualUph)} PCS/H`,
+                      emphasis: null,
+                    },
+                  ]
+                : []),
               {
                 text: `${copy.flow.wip}: ${wip === null ? '—' : `${formatNumber(wip)} PCS`}`,
                 emphasis: isWipOver ? 'danger' : null,
               },
               { text: `${copy.flow.limit}: ${formatNumber(wipLimit)} PCS`, emphasis: null },
-              // Nhãn BOTTLENECK đã bỏ khỏi thẻ cho các thẻ cân bằng, nên thông tin
-              // này chỉ còn đọc được qua tooltip — phải có, không thì trạm nghẽn
-              // mất nhãn hoàn toàn.
               { text: copy.flow.bottleneck, emphasis: isBottleneck ? 'danger' : 'hidden' },
             ].filter((row) => row.emphasis !== 'hidden');
 
@@ -93,17 +97,20 @@ export const FlowStrip = memo(function FlowStrip({
                     render={
                       <div
                         className={cn(
-                          'relative isolate flex h-20 w-full min-w-0 flex-col items-center justify-center rounded-lg border px-1.5 py-1 text-center transition-colors',
+                          'relative isolate flex h-24 w-full min-w-0 flex-col items-center justify-center rounded-xl border border-l-4 px-2 py-1.5 text-center shadow-sm transition-[box-shadow,border-color,transform]',
                           isAlert
-                            ? 'border-danger bg-danger font-semibold text-white alert-pulse'
-                            : 'border-border-strong/80 bg-[var(--surface)]'
+                            ? 'border-danger bg-danger font-semibold text-white shadow-lg shadow-danger/25 alert-pulse'
+                            : cn(
+                                'border-border-strong/70 bg-linear-to-b from-[var(--surface)] to-[var(--surface-hover)] hover:shadow-md',
+                                STATUS_ACCENT[status] ?? 'border-l-border-strong'
+                              )
                         )}
                       />
                     }
                   >
                     <span
                       className={cn(
-                        'max-w-full truncate text-[10px] font-semibold leading-tight 2xl:text-xs',
+                        'max-w-full truncate text-xs font-extrabold tracking-wide leading-tight 2xl:text-sm',
                         isAlert ? 'text-white' : 'text-foreground'
                       )}
                     >
@@ -111,7 +118,7 @@ export const FlowStrip = memo(function FlowStrip({
                     </span>
                     <span
                       className={cn(
-                        'mt-0.5 max-w-full truncate text-[10px] leading-tight 2xl:text-[11px]',
+                        'mt-0.5 max-w-full truncate text-[10px] font-medium leading-tight 2xl:text-[11px]',
                         isAlert ? 'text-white/85' : 'text-muted-foreground'
                       )}
                     >
@@ -121,18 +128,26 @@ export const FlowStrip = memo(function FlowStrip({
                     <div className="mt-1.5 flex min-w-0 items-center justify-center gap-1.5">
                       <span
                         className={cn(
-                          'size-2 shrink-0 rounded-full',
+                          'size-2.5 shrink-0 rounded-full ring-2 ring-inset ring-white/40',
                           isAlert ? 'bg-white' : tone.dot
                         )}
                         aria-hidden="true"
                       />
                       <span
                         className={cn(
-                          'truncate text-[10px] font-semibold tabular-nums 2xl:text-xs',
+                          'truncate text-sm font-bold tabular-nums 2xl:text-base',
                           isAlert ? 'text-white' : 'text-foreground'
                         )}
                       >
                         {formatNumber(station.actualUph)}
+                      </span>
+                      <span
+                        className={cn(
+                          'shrink-0 text-[9px] font-medium leading-none',
+                          isAlert ? 'text-white/80' : 'text-muted-foreground'
+                        )}
+                      >
+                        UPH
                       </span>
                       <span className="sr-only">{statusLabel(status, copy)}</span>
                     </div>
@@ -159,7 +174,7 @@ export const FlowStrip = memo(function FlowStrip({
 
                 {index < stationConfigs.length - 1 ? (
                   <ArrowRight
-                    className="flow-arrow absolute right-[-6px] top-1/2 z-10 size-3 translate-x-1/2 -translate-y-1/2 text-production-blue"
+                    className="flow-arrow absolute -right-1.5 top-1/2 z-10 size-3 translate-x-1/2 -translate-y-1/2 text-production-blue"
                     aria-hidden="true"
                   />
                 ) : null}

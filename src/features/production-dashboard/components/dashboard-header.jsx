@@ -43,6 +43,7 @@ function FilterSelect({
   placeholder,
   disabled = false,
   loading = false,
+  loadingText,
   onValueChange,
   themeStyle,
   children,
@@ -72,7 +73,7 @@ function FilterSelect({
           {loading ? (
             <span className="flex flex-1 items-center gap-1.5 truncate text-left text-muted-foreground">
               <Loader2 className="size-3.5 shrink-0 animate-spin text-production-blue" />
-              <span className="truncate">Đang tải...</span>
+              <span className="truncate">{loadingText ?? '…'}</span>
             </span>
           ) : displayText ? (
             <span className="flex-1 truncate text-left">{displayText}</span>
@@ -192,6 +193,7 @@ export const DashboardHeader = memo(function DashboardHeader({
           placeholder={copy.filters.selectLine}
           disabled={!process || linesLoading}
           loading={linesLoading}
+          loadingText={copy.loadingShort}
           themeStyle={themeStyle}
           onValueChange={onLineChange}
         >
@@ -253,6 +255,7 @@ export const DashboardHeader = memo(function DashboardHeader({
           label={copy.filters.wo ?? 'WO'}
           valueLabel={woLabel || undefined}
           placeholder={copy.filters.selectWo}
+          loadingText={copy.loadingWo}
           disabled={!lineId || woLoading}
           loading={woLoading}
           onOpen={() => setWoPickerOpen(true)}

@@ -1,12 +1,12 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import {
   currentMinutesOfDay,
-  getAreas,
-  getShiftSnapshot,
-  getShifts,
-  getStopReasons,
+  getProductionAreaList,
+  getProductionSnapshot,
+  getProductionShiftList,
+  getProductionStopReasonList,
 } from '@/features/overview/api/production';
 import { buildLineDetailView, buildSnapshotView } from '@/features/overview/lib/snapshot-view';
 import { getStages } from '@/features/overview/api/stages';
@@ -26,17 +26,25 @@ export const DEFAULT_POLL_INTERVAL_MS = 10_000;
 export const STALE_AFTER_SECONDS = 30;
 
 export function useAreas() {
-  return useQuery({ queryKey: queryKeys.areas(), queryFn: getAreas, staleTime: Infinity });
+  return useQuery({
+    queryKey: queryKeys.areas(),
+    queryFn: getProductionAreaList,
+    staleTime: Infinity,
+  });
 }
 
 export function useShifts() {
-  return useQuery({ queryKey: queryKeys.shifts(), queryFn: getShifts, staleTime: Infinity });
+  return useQuery({
+    queryKey: queryKeys.shifts(),
+    queryFn: getProductionShiftList,
+    staleTime: Infinity,
+  });
 }
 
 export function useStopReasons() {
   return useQuery({
     queryKey: queryKeys.stopReasons(),
-    queryFn: getStopReasons,
+    queryFn: getProductionStopReasonList,
     staleTime: Infinity,
   });
 }
@@ -54,7 +62,6 @@ export function useStages({ factory } = {}) {
 
 /**
  * Toàn bộ nhà máy, đã tính toán.
- *
  * @param shiftId       ca đang xem
  * @param currentMinutes mốc "bây giờ". `null` khi xem lại ca đã kết thúc.
  * @param pollInterval  0 để tắt polling (màn TV dùng nhịp riêng)
@@ -66,7 +73,7 @@ export function useProductionSnapshot({
 } = {}) {
   const query = useQuery({
     queryKey: queryKeys.snapshot(shiftId),
-    queryFn: () => getShiftSnapshot({ shiftId, currentMinutes }),
+    queryFn: () => getProductionSnapshot({ shiftId, currentMinutes }),
     refetchInterval: pollInterval,
     retry: 0,
     placeholderData: keepPreviousData,
@@ -84,7 +91,7 @@ export function useProductionSnapshot({
 export function useLineDetail({ shiftId, lineId, currentMinutes, pollInterval }) {
   const query = useQuery({
     queryKey: [...queryKeys.snapshot(shiftId), 'line', lineId],
-    queryFn: () => getShiftSnapshot({ shiftId, currentMinutes }),
+    queryFn: () => getProductionSnapshot({ shiftId, currentMinutes }),
     refetchInterval: pollInterval ?? DEFAULT_POLL_INTERVAL_MS,
     retry: 0,
     placeholderData: keepPreviousData,

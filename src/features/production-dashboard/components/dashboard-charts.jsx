@@ -16,11 +16,13 @@ import {
 } from 'recharts';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { calculateAchievement, formatNumber } from '@/features/production-dashboard/lib/calc';
+import { calculateAchievement } from '@/features/production-dashboard/lib/calc';
+import { formatNumber } from '@/lib/format';
 
 function LegendToggle({ color, label, pressed, onToggle }) {
   return (
@@ -57,25 +59,42 @@ function FilteredTooltipContent({ hiddenKeys = [], ...props }) {
   return <ChartTooltipContent {...props} payload={payload} />;
 }
 
-function ChartMessage({ children, error = false }) {
+function ChartMessage({ children, error = false, action }) {
   return (
     <div
       className={cn(
-        'flex h-full min-h-[160px] items-center justify-center px-4 text-center text-xs',
+        'flex h-full min-h-[160px] flex-col items-center justify-center gap-2 px-4 text-center text-xs',
         error ? 'text-danger-text' : 'text-muted-foreground'
       )}
     >
-      {children}
+      <span>{children}</span>
+      {action}
     </div>
   );
 }
 
-function ChartLoading() {
+/** Nút thử lại dùng chung cho các panel lỗi của biểu đồ. */
+function ChartRetry({ copy, onRetry }) {
+  if (!onRetry) return null;
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="shrink-0 border-danger/40 text-danger-text hover:bg-danger/10 hover:text-danger-text"
+      onClick={onRetry}
+    >
+      {copy.retry}
+    </Button>
+  );
+}
+
+function ChartLoading({ copy }) {
   return (
     <div className="relative flex h-full min-h-[160px] flex-col justify-end gap-3 px-2 pb-2">
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/30 backdrop-blur-[1px]">
         <Loader2 className="size-6 animate-spin text-production-blue" />
-        <span className="text-xs font-medium text-muted-foreground">Đang tải biểu đồ...</span>
+        <span className="text-xs font-medium text-muted-foreground">{copy.loadingCharts}</span>
       </div>
       <div className="flex h-full items-end gap-3">
         {[52, 76, 62, 86, 42, 66].map((height, index) => (
@@ -187,18 +206,18 @@ function OutputChart({
   error,
   globalError,
   copy,
+  scope,
+  onRetry,
   finalStationId,
   className,
 }) {
-  // Ẩn khung chưa tới (future): WO mới chạy mà vẽ cả 6 khung thì 2/3 biểu đồ
-  // là khoảng trống, đường achievement cắm xuống 0 gây hiểu nhầm "rớt".
-  // Xem ngày quá khứ thì không có future nên đủ 6 cột như cũ. Xem ngày tương
-  // lai (toàn future) thì mảng rỗng → rơi vào nhánh noData, đúng thực tế.
-  // Bucket rỗng (empty, WO ngắn ngày) cũng ẩn luôn.
-  const visibleSlots = slots.filter((s, i) => !s.empty && slotStates[i] !== 'future');
-  const visibleSlotStates = slotStates.filter(
-    (_, i) => !slots[i].empty && slotStates[i] !== 'future'
-  );
+  // Vẫn vẽ ĐỦ các khung giờ của ca, kể cả khung chưa tới — người xem cần thấy
+  // toàn cảnh 6 khung (08-10 … 18-20) thay vì biểu đồ chỉ dài tới giờ hiện tại.
+  // Khung future để giá trị null (không phải 0) nên không có cột và đường
+  // achievement dừng lại, không cắm xuống 0 gây hiểu nhầm "rớt".
+  // Bucket rỗng (empty, WO ngắn ngày) vẫn ẩn vì chỉ là chỗ giữ index.
+  const visibleSlots = slots.filter((s) => !s.empty);
+  const visibleSlotStates = slotStates.filter((_, i) => !slots[i].empty);
   const chartData = useMemo(
     () =>
       visibleSlots.map((slot, index) => {
@@ -212,8 +231,10 @@ function OutputChart({
           label: slot.label,
           plannedOutput: isFuture ? null : (finalStationOutput?.plannedOutput ?? null),
           actualOutput: isFuture ? null : (finalStationOutput?.actualOutput ?? null),
+          // Khung chưa tới: chưa sản xuất = 0% để đường tỷ lệ vòng xuống 0 và
+          // chạy tiếp tới cuối ca, thay vì đứt ngang ở khung hiện tại.
           achievement: isFuture
-            ? null
+            ? 0
             : (finalStationOutput?.achievement ??
               calculateAchievement(
                 finalStationOutput?.actualOutput,
@@ -259,13 +280,15 @@ function OutputChart({
   return (
     <ChartCard
       className={className}
-      title={copy.charts.output}
+      title={scope === 'WO' ? copy.charts.outputWo : copy.charts.output}
       meta={finalStationId ? `${copy.charts.finalStation} ${finalStationId}` : undefined}
     >
       {loading ? (
-        <ChartLoading />
+        <ChartLoading copy={copy} />
       ) : error || globalError ? (
-        <ChartMessage error>{copy.errors.hourly}</ChartMessage>
+        <ChartMessage error action={<ChartRetry copy={copy} onRetry={onRetry} />}>
+          {copy.errors.hourly}
+        </ChartMessage>
       ) : !hasFinalStationData ? (
         <ChartMessage>{copy.noData}</ChartMessage>
       ) : (
@@ -283,7 +306,7 @@ function OutputChart({
             <ComposedChart
               accessibilityLayer
               data={chartData}
-              margin={{ top: 20, right: 12, left: 4, bottom: hasDateLabels ? 20 : 0 }}
+              margin={{ top: 24, right: 12, left: 4, bottom: hasDateLabels ? 20 : 0 }}
               barGap={1}
               barCategoryGap="12%"
             >
@@ -305,18 +328,18 @@ function OutputChart({
                 yAxisId="output"
                 axisLine={false}
                 tickLine={false}
-                width={42}
+                width={60}
                 tickCount={4}
                 domain={[0, (dataMax) => Math.max(10, Math.ceil((dataMax || 0) * 1.25))]}
                 tickFormatter={formatNumber}
                 tick={{ fill: 'var(--muted-foreground)', fontSize: 9 }}
                 label={{
                   value: copy.charts.outputAxis,
-                  angle: -90,
-                  position: 'insideLeft',
+                  angle: 0,
+                  position: 'left',
                   fill: 'var(--muted-foreground)',
                   fontSize: 9,
-                  offset: 2,
+                  offset: 4,
                 }}
               />
               <YAxis
@@ -381,6 +404,19 @@ function OutputChart({
                   offset={8}
                 />
               </Line>
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <FilteredTooltipContent
+                    indicator="dot"
+                    hiddenKeys={[
+                      hidden.plannedOutput && 'plannedOutput',
+                      hidden.actualOutput && 'actualOutput',
+                      hidden.achievement && 'achievement',
+                    ].filter(Boolean)}
+                  />
+                }
+              />
             </ComposedChart>
           </ChartContainer>
           <ChartLegendBar>
@@ -419,6 +455,7 @@ function UphTrendChart({
   error,
   globalError,
   copy,
+  onRetry,
   lineType,
   finalStationId,
 }) {
@@ -435,25 +472,30 @@ function UphTrendChart({
     .map(stationTrend)
     .find((point) => point?.target !== null && point?.target !== undefined)?.target;
 
-  // Ẩn khung chưa tới (future) — xem chú thích tương tự ở OutputChart.
-  const visibleSlots = slots.filter((s, i) => !s.empty && slotStates[i] !== 'future');
-  const visibleSlotStates = slotStates.filter(
-    (_, i) => !slots[i].empty && slotStates[i] !== 'future'
-  );
+  // Giữ đủ khung giờ như OutputChart (kể cả khung chưa tới) để hai biểu đồ
+  // luôn thẳng cột và người xem thấy trọn ca.
+  const visibleSlots = slots.filter((s) => !s.empty);
+  const visibleSlotStates = slotStates.filter((_, i) => !slots[i].empty);
 
   const chartData = useMemo(
     () =>
       visibleSlots.map((slot, index) => {
         const point = stationTrend(trend.find((item) => item.slotId === slot.id));
+        const isFuture = visibleSlotStates[index] === 'future';
         return {
           label: slot.label,
-          actual: visibleSlotStates[index] === 'future' ? null : (point?.actual ?? null),
+          // Khung chưa tới: chưa sản xuất = 0 UPH để đường thực tế vòng xuống
+          // 0 và chạy tới cuối ca, đồng bộ với biểu đồ tỷ lệ đạt kế hoạch.
+          actual: isFuture ? 0 : (point?.actual ?? null),
           target: point?.target ?? configuredTarget ?? null,
+          isFuture,
         };
       }),
     [visibleSlots, trend, visibleSlotStates, stationTrend, configuredTarget]
   );
-  const hasFinalStationData = chartData.some((point) => point.actual !== null);
+  // Chỉ tính là "có dữ liệu" khi có khung thật (không phải future) — nếu không,
+  // ngày tương lai sẽ vẽ một đường 0 thay vì hiện thông báo chưa có dữ liệu.
+  const hasFinalStationData = chartData.some((point) => !point.isFuture && point.actual !== null);
   // Nhãn WO có dấu "/" → cần xử lý tương tự OutputChart
   const hasDateLabels = chartData.some((point) => point.label?.includes('/'));
   const config = {
@@ -467,9 +509,11 @@ function UphTrendChart({
       meta={finalStationId ? `${copy.charts.finalStation} ${finalStationId}` : undefined}
     >
       {loading ? (
-        <ChartLoading />
+        <ChartLoading copy={copy} />
       ) : error || globalError ? (
-        <ChartMessage error>{copy.errors.uphTrend}</ChartMessage>
+        <ChartMessage error action={<ChartRetry copy={copy} onRetry={onRetry} />}>
+          {copy.errors.uphTrend}
+        </ChartMessage>
       ) : !hasFinalStationData ? (
         <ChartMessage>{copy.noData}</ChartMessage>
       ) : (
@@ -559,7 +603,9 @@ function UphTrendChart({
                 <LabelList
                   dataKey="actual"
                   position="top"
-                  formatter={(value) => (value == null ? '' : formatNumber(value))}
+                  // Khung chưa tới có giá trị 0 — không cần in 4 nhãn "0" sát đáy
+                  // trục, đường đã cho thấy rõ.
+                  formatter={(value) => (value ? formatNumber(value) : '')}
                   fill="var(--chart-4)"
                   fontSize={10}
                   offset={8}
@@ -587,7 +633,7 @@ function UphTrendChart({
   );
 }
 
-function StationUphChart({ stations, loading, error, globalError, bottleneckId, copy }) {
+function StationUphChart({ stations, loading, error, globalError, bottleneckId, onRetry, copy }) {
   const chartData = useMemo(
     () =>
       stations.map((station) => ({
@@ -607,9 +653,11 @@ function StationUphChart({ stations, loading, error, globalError, bottleneckId, 
   return (
     <ChartCard title={copy.charts.stationUph}>
       {loading ? (
-        <ChartLoading />
+        <ChartLoading copy={copy} />
       ) : error || globalError ? (
-        <ChartMessage error>{copy.errors.stations}</ChartMessage>
+        <ChartMessage error action={<ChartRetry copy={copy} onRetry={onRetry} />}>
+          {copy.errors.stations}
+        </ChartMessage>
       ) : !stations.some((station) => station.actualUph != null) ? (
         <ChartMessage>{copy.noData}</ChartMessage>
       ) : (
@@ -727,8 +775,10 @@ export const DashboardCharts = memo(function DashboardCharts({
   bottleneckId,
   copy,
   lineType,
+  scope = 'DAY',
   chartLayout,
   onChartLayoutChange,
+  onRetry,
 }) {
   const slotList = slots ?? [];
   const gridClasses = cn(
@@ -739,7 +789,10 @@ export const DashboardCharts = memo(function DashboardCharts({
   );
 
   return (
-    <section aria-label={copy.charts.output} className="flex min-h-0 min-w-0 flex-col gap-2">
+    <section
+      aria-label={scope === 'WO' ? copy.charts.outputWo : copy.charts.output}
+      className="flex min-h-0 min-w-0 flex-col gap-2"
+    >
       <ChartLayoutControls
         chartLayout={chartLayout}
         onChartLayoutChange={onChartLayoutChange}
@@ -754,6 +807,8 @@ export const DashboardCharts = memo(function DashboardCharts({
           error={hourlyError}
           globalError={globalError}
           copy={copy}
+          scope={scope}
+          onRetry={onRetry}
           finalStationId={finalStationId}
           className={
             chartLayout === 'balanced'
@@ -771,6 +826,7 @@ export const DashboardCharts = memo(function DashboardCharts({
           error={uphTrendError}
           globalError={globalError}
           copy={copy}
+          onRetry={onRetry}
           lineType={lineType}
           finalStationId={finalStationId}
         />
@@ -780,6 +836,7 @@ export const DashboardCharts = memo(function DashboardCharts({
           error={stationsError}
           globalError={globalError}
           bottleneckId={bottleneckId}
+          onRetry={onRetry}
           copy={copy}
         />
       </div>
