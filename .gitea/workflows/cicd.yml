@@ -1,4 +1,3 @@
-
 name: MES Production Dashboard CI/CD
 
 on:
@@ -20,14 +19,14 @@ jobs:
         shell: powershell
 
     env:
-      SITE_NAME: MES_Dashboard
+      SITE_NAME: 'MES_Dashboard'
       DEPLOY_ROOT: 'D:\Senao\MESProductionDashboard'
       CI_ROOT: 'D:\Senao\CI\MESProductionDashboard'
       PUBLISH_DIR: 'D:\Senao\CI\MESProductionDashboard\publish'
       RELEASES_DIR: 'D:\Senao\CI\MESProductionDashboard\releases'
       BACKUP_ROOT: 'D:\Senao\CI\MESProductionDashboard\backup'
-      KEEP_RELEASES: 5
-      KEEP_BACKUPS: 10
+      KEEP_RELEASES: '5'
+      KEEP_BACKUPS: '10'
 
     steps:
       - name: Checkout
@@ -76,32 +75,60 @@ jobs:
             throw "package-lock.json not found; npm ci requires a lockfile."
           }
 
+      # Diagnostic step: kiểm tra registry trước khi cài dependencies.
+      - name: Diagnose npm registry
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Write-Host "=== npm environment ==="
+          node --version
+          npm --version
+          Write-Host "Registry:"
+          npm config get registry
+          Write-Host "Cache:"
+          npm config get cache
+
+          Write-Host "=== Check npm registry connectivity ==="
+          npm ping --fetch-timeout=15000
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Cannot reach npm registry. Check DNS, proxy, firewall or registry configuration."
+          }
+
+          Write-Host "npm registry is reachable."
+
       - name: Install dependencies
         run: |
           $ErrorActionPreference = 'Stop'
 
-          npm ci
+          Write-Host "Starting npm ci..."
+          npm ci --verbose --no-audit --no-fund
+
           if ($LASTEXITCODE -ne 0) {
-            throw "npm ci failed."
+            throw "npm ci failed with exit code $LASTEXITCODE."
           }
+
+          Write-Host "npm ci completed successfully."
 
       - name: Build Vite application
         run: |
           $ErrorActionPreference = 'Stop'
 
+          Write-Host "Starting Vite build..."
           npm run build
+
           if ($LASTEXITCODE -ne 0) {
             throw "Vite build failed."
           }
 
           $dist = Join-Path $PWD "dist"
 
-          if (!(Test-Path (Join-Path $dist "index.html"))) {
-            throw "Vite output missing: dist/index.html"
-          }
-
           if (!(Test-Path $dist -PathType Container)) {
             throw "Vite output directory not found: $dist"
+          }
+
+          if (!(Test-Path (Join-Path $dist "index.html"))) {
+            throw "Vite output missing: dist/index.html"
           }
 
           $assets = Join-Path $dist "assets"
@@ -121,7 +148,7 @@ jobs:
           New-Item -ItemType Directory -Force $env:CI_ROOT |
             Out-Null
 
-          # Xóa riêng thư mục publish, không xóa cache runner
+          # Xóa riêng thư mục publish, không xóa cache runner.
           if (Test-Path $publish) {
             Remove-Item $publish -Recurse -Force
           }
@@ -155,7 +182,7 @@ jobs:
             throw "Publish artifact missing index.html."
           }
 
-          if (!(Test-Path (Join-Path $publish "assets"))) {
+          if (!(Test-Path (Join-Path $publish "assets") -PathType Container)) {
             throw "Publish artifact missing assets directory."
           }
 
@@ -165,8 +192,6 @@ jobs:
 
           Write-Host "Publish artifact validated."
 
-      # Backup, deploy, smoke test và rollback nằm trong MỘT step
-      # để PowerShell có thể quản lý lỗi xuyên suốt quá trình.
       - name: Deploy to IIS with automatic rollback
         run: |
           $ErrorActionPreference = 'Stop'
@@ -189,8 +214,7 @@ jobs:
             throw "Cannot determine application pool for $siteName."
           }
 
-          $poolInfo = Get-Item "IIS:\AppPools\$appPool" `
-            -ErrorAction Stop
+          $null = Get-Item "IIS:\AppPools\$appPool" -ErrorAction Stop
 
           $previousPath = [Environment]::ExpandEnvironmentVariables(
             [string]$site.physicalPath
@@ -210,7 +234,7 @@ jobs:
             Out-Null
 
           $releaseName = (
-            Get-Content (Join-Path $ciRoot "ci_release_name.txt") -Raw
+            Get-Content (Join-Path $ciRoot "ci_release_name.txt" -Raw)
           ).Trim()
 
           if ($releaseName -notmatch '^\d{8}_\d{6}_[0-9a-fA-F]+$') {
@@ -251,7 +275,6 @@ jobs:
             $port = $parts[1]
             $hostHeader = $parts[2]
 
-            # Use localhost for wildcard IP bindings.
             $connectHost = $ip
             if ([string]::IsNullOrWhiteSpace($connectHost) -or
                 $connectHost -eq '*' -or
@@ -259,7 +282,6 @@ jobs:
               $connectHost = 'localhost'
             }
 
-            # Host-header bindings require the configured hostname.
             if (![string]::IsNullOrWhiteSpace($hostHeader)) {
               $connectHost = $hostHeader
             }
@@ -271,14 +293,17 @@ jobs:
           }
 
           function Test-SiteHttp {
-            param([string]$Url, [bool]$IsHttps)
+            param(
+              [string]$Url,
+              [bool]$IsHttps
+            )
 
             for ($i = 1; $i -le 12; $i++) {
               try {
                 $curlArgs = @(
-                  '-sS'
-                  '-o', 'NUL'
-                  '-w', '%{http_code}'
+                  '-sS',
+                  '-o', 'NUL',
+                  '-w', '%{http_code}',
                   '--max-time', '15'
                 )
 
@@ -292,14 +317,14 @@ jobs:
                 $curlExit = $LASTEXITCODE
                 $code = ([string]$response).Trim()
 
-                Write-Host "Smoke test attempt $i: HTTP $code"
+                Write-Host "Smoke test attempt ${i}: HTTP $code"
 
                 if ($curlExit -eq 0 -and $code -eq '200') {
                   return $true
                 }
               }
               catch {
-                Write-Host "Smoke test attempt $i failed: $($_.Exception.Message)"
+                Write-Host "Smoke test attempt ${i} failed: $($_.Exception.Message)"
               }
 
               Start-Sleep -Seconds 5
@@ -309,7 +334,10 @@ jobs:
           }
 
           function Start-PreviousRelease {
-            param([string]$OldPath, [string]$Pool)
+            param(
+              [string]$OldPath,
+              [string]$Pool
+            )
 
             Write-Host "Restoring IIS physical path: $OldPath"
 
@@ -339,7 +367,7 @@ jobs:
           }
 
           try {
-            # 1. Stage release before stopping the live site.
+            # 1. Stage the new release before stopping the live site.
             New-Item -ItemType Directory -Force $releasePath |
               Out-Null
 
@@ -347,7 +375,7 @@ jobs:
               -Destination $releasePath `
               -Recurse -Force
 
-            # Grant the IIS app pool read/execute access.
+            # Grant IIS application pool read/execute permissions.
             $aclUser = "IIS AppPool\$appPool"
 
             & icacls.exe $releasePath `
@@ -365,7 +393,7 @@ jobs:
               throw "Staged release is missing version.txt."
             }
 
-            # 2. Backup current website files before touching IIS.
+            # 2. Back up current website files.
             New-Item -ItemType Directory -Force $backupPath |
               Out-Null
 
@@ -393,7 +421,7 @@ jobs:
 
             Write-Host "Backup created: $backupPath"
 
-            # 3. Switch IIS. Any failure from this point triggers rollback.
+            # 3. Switch IIS. Failures from this point trigger rollback.
             $iisTouched = $true
 
             Stop-Website -Name $siteName
@@ -420,7 +448,7 @@ jobs:
               throw "IIS site failed to start."
             }
 
-            # 4. Smoke test the new release.
+            # 4. Smoke test the deployed site.
             $target = Get-SmokeTarget -Name $siteName
             Write-Host "Testing $($target.Url)"
 
@@ -428,7 +456,7 @@ jobs:
               throw "New release did not return HTTP 200."
             }
 
-            # Verify IIS points to the expected release.
+            # Verify that IIS points to the expected release.
             $activePath = [Environment]::ExpandEnvironmentVariables(
               [string](Get-Website -Name $siteName).physicalPath
             )
@@ -442,7 +470,7 @@ jobs:
           }
           catch {
             $deployError = $_.Exception.Message
-            Write-Error "Deployment failed: $deployError"
+            Write-Host "Deployment failed: $deployError"
 
             if ($iisTouched) {
               try {
@@ -456,14 +484,12 @@ jobs:
             throw "Deployment failed. $(if ($iisTouched) { 'Rollback completed.' } else { 'The live IIS site was not changed.' }) Reason: $deployError"
           }
           finally {
-            # Do not remove the staged release if deployment failed;
-            # keep it for troubleshooting.
             if (!$deploymentSucceeded) {
               Write-Host "Deployment unsuccessful; preserving files for investigation."
             }
           }
 
-          # 5. Prune only after a successful deploy and smoke test.
+          # 5. Prune old releases/backups only after successful deployment.
           $activePath = [string](Get-Website -Name $siteName).physicalPath
           $keepReleases = [int]$env:KEEP_RELEASES
           $keepBackups = [int]$env:KEEP_BACKUPS
