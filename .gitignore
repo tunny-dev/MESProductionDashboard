@@ -83,3 +83,4 @@ docs/
 design/
 db/
 scripts/
+.agents/

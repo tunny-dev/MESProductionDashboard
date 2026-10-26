@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cva } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
+import { cn } from '@/core/utils/utils';
 
 const kbdVariants = cva(
   'select-none rounded border px-1.5 py-px font-mono text-[0.7rem] font-normal shadow-xs disabled:opacity-50',

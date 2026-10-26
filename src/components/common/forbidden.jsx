@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { ErrorPrimaryButton, ErrorScreen } from './error-screen';
+import { ErrorPrimaryButton, ErrorScreen } from './ErrorScreen';
 
 export function Forbidden() {
   const { t } = useTranslation();

@@ -137,10 +137,10 @@
 }
 
 :root {
-  --background: #eceff2;
+  --background: #f5f7fa;
   --surface: #ffffff;
   --surface-overlay: #ffffff;
-  --surface-hover: #f5f7f9;
+  --surface-hover: #f0f3f6;
   --foreground: #1a2029;
 
   --card: #ffffff;
@@ -229,10 +229,10 @@
 }
 
 .dark {
-  --background: #0b0f14;
-  --surface: #131a22;
-  --surface-overlay: #1b242e;
-  --surface-hover: #1b242e;
+  --background: #0d1117;
+  --surface: #161c24;
+  --surface-overlay: #1c2530;
+  --surface-hover: #1c2530;
   --foreground: #e7edf4;
 
   --card: #131a22;

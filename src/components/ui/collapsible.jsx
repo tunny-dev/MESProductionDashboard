@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Collapsible as CollapsiblePrimitive } from '@base-ui/react/collapsible';
-import { cn } from '@/lib/utils';
+import { cn } from '@/core/utils/utils';
 
 export function Collapsible({
   open: controlledOpen,
