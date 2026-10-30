@@ -233,7 +233,7 @@ jobs:
           New-Item -ItemType Directory -Force $backupRoot |
             Out-Null
 
-         $releaseName = (
+          $releaseName = (
               Get-Content -LiteralPath (Join-Path $ciRoot "ci_release_name.txt") -Raw
           ).Trim()
 
