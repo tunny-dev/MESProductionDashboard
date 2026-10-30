@@ -217,9 +217,11 @@ export function ProductionDashboardPage() {
         shiftEndDate,
         cycleTimeTargetMap,
         scopeId,
+        summary: viewData?.summary,
       }),
     [
       viewData?.stations,
+      viewData?.summary,
       activeLineConfig,
       lineConfig,
       model,
@@ -239,8 +241,16 @@ export function ProductionDashboardPage() {
 
   const uphTargetState = useMemo(() => {
     const cyclePart = parts.find((part) => part.key === 'cycleTime');
+    // Chỉ kiểm tra cảnh báo khi cả bảng trạm VÀ query cycleTime đã tải xong hoàn toàn (tránh race condition báo động giả)
+    const isReady =
+      Boolean(viewData) &&
+      stationRows.length > 0 &&
+      cyclePart?.status !== 'loading' &&
+      cyclePart?.status !== 'idle';
+    if (!isReady) return null;
+
     return resolveUphTargetState({
-      hasData: Boolean(viewData),
+      hasData: isReady,
       hasTarget: stationRows.some((station) => Number(station.targetUph) > 0),
       cycleTimeStatus: cyclePart?.status,
     });

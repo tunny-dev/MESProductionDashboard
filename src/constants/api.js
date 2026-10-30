@@ -1,4 +1,4 @@
-﻿export const MES_BASE_URL = String(import.meta.env.VITE_MES_URL ?? '').replace(/\/+$/, '');
+export const MES_BASE_URL = String(import.meta.env.VITE_MES_URL ?? '').replace(/\/+$/, '');
 
 export const MES_SYSTEMS = {
   mes: {
@@ -37,6 +37,7 @@ export const MES_S_CODES = {
   production: {
     getFlowByMo: 'getFlowByMo',
     getCycleTime: 'getCycleTime',
+    getCycleTimeFromOracel: 'getCycleTimeFromOracel',
     getMoSummary: 'getMoSummary',
     getProductionAchievement: 'getProductionAchievement',
     getUphTrend: 'getUphTrend',

@@ -1,4 +1,4 @@
-﻿import { MES_S_CODES } from '@/constants/api';
+import { MES_S_CODES } from '@/constants/api';
 import { mesRows } from '@/core/api/mesClient';
 
 /**
@@ -88,19 +88,25 @@ export const DASHBOARD_PARTS = [
    * 6. Cycle time / target UPH thật từ CimCycleTime (nguồn Oracle).
    * sCode `getCycleTime` → `sp_get_cycle_time`.
    * Trả nhiều dòng: `Stage, TargetUph` (và UsageMin, PeopleCount...).
-   * FE dùng để ghi đè targetUph hardcode (400) bằng số thật.
+   * FE dùng để tra UPH mục tiêu theo từng trạm.
    */
   {
     key: 'cycleTime', // getCycleTime / sp_get_cycle_time
     label: 'Cycle time / UPH mục tiêu',
     sCode: MES_S_CODES.production.getCycleTime,
-    usesModel: false,
-    buildParams: ({ mo, dateStr }) => ({
-      sDate: dateStr,
-      mo,
-      mfgType: null,
-      stage: null,
-    }),
+    usesModel: true,
+    buildParams: ({ mo, dateStr, model }) => {
+      const partNo = model && model !== 'ALL' ? model : null;
+      return {
+        mo: mo || null,
+        partNumber: partNo,
+        modelName: partNo,
+        mfgType: null,
+        stage: null,
+        sDate: dateStr || null,
+        scope: null,
+      };
+    },
   },
 ];
 
@@ -117,6 +123,29 @@ export async function getPart(key, args) {
   if (!part) throw new Error(`[dashboard] Không có nguồn "${key}" trong DASHBOARD_PARTS`);
 
   const params = part.buildParams(args);
-  const rows = await mesRows(part.sCode, params);
+  let rows = await mesRows(part.sCode, params);
+
+  // Fallback: nếu tra CimCycleTime (getCycleTime) chưa có dữ liệu (rows rỗng),
+  // MỚI gọi sang getCycleTimeFromOracel để kéo định mức từ Oracle ERP BOM.
+  // Nếu CimCycleTime ĐÃ CÓ dữ liệu rồi thì dừng luôn, KHÔNG gọi Oracle nữa.
+  if (key === 'cycleTime' && (!Array.isArray(rows) || rows.length === 0)) {
+    try {
+      const oracleParams = {
+        mo: params.mo || null,
+        partNumber: params.partNumber || null,
+        sDate: params.sDate || null,
+      };
+      const fallbackRows = await mesRows(
+        MES_S_CODES.production.getCycleTimeFromOracel || 'getCycleTimeFromOracel',
+        oracleParams
+      );
+      if (Array.isArray(fallbackRows) && fallbackRows.length > 0) {
+        rows = fallbackRows;
+      }
+    } catch {
+      // Giữ nguyên rows rỗng nếu fallback gặp lỗi kết nối
+    }
+  }
+
   return { sCode: part.sCode, endpoint: part.sCode, params, rows };
 }

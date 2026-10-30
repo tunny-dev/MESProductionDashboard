@@ -98,6 +98,16 @@ function getColumns({ onEdit }) {
       className: 'w-28',
     },
     {
+      key: 'targetUph',
+      header: () => <span className="block w-full text-right">Target UPH</span>,
+      cell: (row) => (
+        <span className="block text-right tabular-nums font-semibold text-primary">
+          {row.targetUph != null ? Number(row.targetUph).toLocaleString() : '—'}
+        </span>
+      ),
+      className: 'w-28',
+    },
+    {
       key: 'updatedAt',
       header: 'Updated At',
       cell: (row) => (
@@ -129,7 +139,7 @@ function getColumns({ onEdit }) {
 }
 
 // Search fields
-const SEARCH_FIELDS = ['modelName', 'partNumber', 'mfgType', 'stage', 'stageDes'];
+const SEARCH_FIELDS = ['modelName', 'partNumber', 'mfgType', 'stage', 'stageDes', 'targetUph'];
 
 // CimCycleTimeTable
 export function CimCycleTimeTable({ rows = [], isLoading, onEdit, onAdd, isFetching, onRefetch }) {

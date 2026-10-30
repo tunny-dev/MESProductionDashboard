@@ -37,24 +37,50 @@ export function sanitizeStationUph(apiUph, spanMin) {
 }
 
 /**
- * Tỷ lệ tốt của trạm = số đạt LẦN ĐẦU ÷ số đầu vào (FPY)
- * Tỷ lệ chất lượng = First-pass yield (FPY).
- * FPY = số đạt LẦN ĐẦU (TA028 = '1') ÷ số đầu vào.
+ * Tỷ lệ chất lượng của trạm (%).
+ * Ưu tiên FPY = firstPass / inputQty nếu có.
+ * Fallback: nếu trạm không check-in (inputQty = 0) hoặc chưa có firstPass,
+ * dùng outputQty / (outputQty + ngQty) để tránh rỗng số liệu.
  */
-export function calculateYield(firstPass, inputQty, actualOutput) {
-  void actualOutput;
+export function calculateYield(firstPass, inputQty, actualOutput, ngQty) {
   const input = Number(inputQty);
-  if (!Number.isFinite(input) || input <= 0) return null;
+  const output = Number(actualOutput);
+  const ng = Number(ngQty) || 0;
 
-  // firstPass null/undefined = BE chưa trả TA028 → không tính, không fallback.
-  if (firstPass === null || firstPass === undefined) return null;
-  const good = Number(firstPass);
-  if (!Number.isFinite(good) || good < 0 || good > input) return null;
+  const total =
+    Number.isFinite(input) && input > 0
+      ? input
+      : Number.isFinite(output) && output > 0
+        ? output + ng
+        : 0;
 
-  return Math.min((good / input) * 100, 100);
+  if (total <= 0) return null;
+
+  let good = null;
+  if (firstPass !== null && firstPass !== undefined) {
+    const fp = Number(firstPass);
+    if (Number.isFinite(fp) && fp >= 0) {
+      good = Math.min(fp, total);
+    }
+  }
+
+  if (good === null) {
+    if (Number.isFinite(output) && output >= 0) {
+      good = Math.min(output, total);
+    } else {
+      good = Math.max(0, total - ng);
+    }
+  }
+
+  return Math.min((good / total) * 100, 100);
 }
 
 export function getStationWip(station, index, stations, summary) {
+  // Trạm cuối cùng của quy trình: không có trạm sau nên không có WIP dở dang giữa 2 trạm (hiển thị '—')
+  if (Array.isArray(stations) && index === stations.length - 1) {
+    return null;
+  }
+
   if (
     station?.stuckQty !== null &&
     station?.stuckQty !== undefined &&
@@ -64,6 +90,14 @@ export function getStationWip(station, index, stations, summary) {
   }
   if (station?.wip !== null && station?.wip !== undefined && Number.isFinite(Number(station.wip))) {
     return Number(station.wip);
+  }
+
+  // Nếu cả trạm này và trạm kế tiếp có số lũy kế (cumQty), tính lượng đệm tồn dở dang thực tế giữa 2 trạm
+  const nextStation = Array.isArray(stations) ? stations[index + 1] : null;
+  const currentCum = Number(station?.cumQty);
+  const nextCum = Number(nextStation?.cumQty);
+  if (Number.isFinite(currentCum) && Number.isFinite(nextCum) && currentCum > 0) {
+    return Math.max(0, currentCum - nextCum);
   }
 
   const output = Number(station?.actualOutput);
@@ -108,13 +142,13 @@ export function parseTaTimestamp(value) {
 
 /** Ngưỡng cho trạng thái trạm. */
 const STATION_STATUS_THRESHOLD = {
-  yieldAbnormal: 95, // tỷ lệ tốt dưới ngưỡng này = bất thường
-  slotAbnormal: 90, // % đạt slot vừa kết thúc dưới ngưỡng này = bất thường
-  slotWaiting: 95, // từ ngưỡng này trở xuống = chờ xử lý
-  yieldMinSample: 30, // dưới mẫu này không xét tỷ lệ tốt (tránh báo động giả)
+  yieldAbnormal: 90, // Tỷ lệ chất lượng < 90% = bất thường (chuẩn công nghiệp)
+  slotAbnormal: 75, // % đạt slot vừa kết thúc < 75% = bất thường
+  slotWaiting: 85, // dưới 85% = cần chú ý / chờ xử lý
+  yieldMinSample: 20, // dưới mẫu này không xét tỷ lệ tốt (tránh báo động giả)
   idleStopMin: 30, // phút không có log = dừng
-  wipRatio: 0.01, // WIP > 1% kế hoạch = chờ xử lý
-  wipMin: 50, // hoặc WIP > 50 món, tuỳ cái nào lớn hơn
+  wipRatio: 0.05, // WIP > 5% kế hoạch = chờ xử lý
+  wipMin: 100, // hoặc WIP > 100 món, tuỳ cái nào lớn hơn
 };
 
 /** Trạng thái trạm: RUNNING/WAITING/ABNORMAL/STOP. Dừng trước Bất thường. */
@@ -143,7 +177,7 @@ export function getStationStatus(
     }
   }
 
-  const yieldPct = calculateYield(station.firstPass, input, output);
+  const yieldPct = calculateYield(station.firstPass, input, output, ng);
   const wip = input - output;
   const wipLimit = Math.max(
     planOut * STATION_STATUS_THRESHOLD.wipRatio,
@@ -160,7 +194,7 @@ export function getStationStatus(
       ? (station.hourlyAchievement?.[lastCompletedSlotIndex] ?? null)
       : totalAchv;
 
-  // 2. Bất thường — chất lượng hoặc tốc độ lệch.
+  // 2. Bất thường — chất lượng quá thấp hoặc dừng trệ nghiêm trọng
   if (
     yieldPct !== null &&
     sampled >= STATION_STATUS_THRESHOLD.yieldMinSample &&
@@ -172,13 +206,13 @@ export function getStationStatus(
     return 'ABNORMAL';
   }
 
-  // 3. Chờ xử lý — tồn đọng hoặc hụt nhẹ so với kế hoạch.
+  // 3. Chờ xử lý — tồn đọng hoặc hụt so với kế hoạch.
   if (wip > wipLimit) return 'WAITING';
   if (lastSlotAchv !== null && lastSlotAchv < STATION_STATUS_THRESHOLD.slotWaiting) {
     return 'WAITING';
   }
 
-  // 4. Đang chạy.
+  // 4. Đang chạy bình thường.
   return 'RUNNING';
 }
 

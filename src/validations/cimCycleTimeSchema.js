@@ -19,6 +19,16 @@ export const cimCycleTimeSchema = z
       .refine((v) => v === '' || v == null || !Number.isNaN(Number(v)), { message: 'Phải là số' })
       .refine((v) => v === '' || v == null || Number(v) >= 0, { message: 'Phải ≥ 0' }),
 
+    targetUph: z
+      .string()
+      .optional()
+      .or(z.literal(''))
+      .refine(
+        (v) => v === '' || v == null || (!Number.isNaN(Number(v)) && Number.isInteger(Number(v))),
+        { message: 'Phải là số nguyên' }
+      )
+      .refine((v) => v === '' || v == null || Number(v) >= 0, { message: 'Phải ≥ 0' }),
+
     peopleCount: z
       .string()
       .optional()

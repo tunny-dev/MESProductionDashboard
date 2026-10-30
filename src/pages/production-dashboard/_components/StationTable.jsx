@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Table,
   TableBody,
@@ -343,20 +344,32 @@ export const StationTable = memo(function StationTable({
             <TableBody>
               {stations.length ? (
                 stations.map((station, index) => {
-                  const stationConfig = lineConfig.stations[index];
+                  const stationConfig =
+                    lineConfig?.stations?.find((s) => s.id === station.stationId) ??
+                    lineConfig?.stations?.[index] ??
+                    station;
                   const wip = getStationWip(station, index, stations, summary);
                   const wipLimit = getWipLimit(stationConfig);
                   const wipOverLimit = wip !== null && wip > wipLimit;
                   const yieldPercent =
                     station.yield ??
-                    calculateYield(station.firstPass, station.actualInput, station.actualOutput);
+                    calculateYield(
+                      station.firstPass,
+                      station.actualInput,
+                      station.actualOutput,
+                      station.ngQty
+                    );
                   const isBottleneck = station.stationId === bottleneckId;
+                  const isInactive =
+                    Number(station.actualInput || 0) === 0 &&
+                    Number(station.actualOutput || 0) === 0;
 
                   return (
                     <TableRow
                       key={station.stationId}
                       className={cn(
                         'group h-6 border-border/50 bg-[var(--surface)] hover:bg-[var(--surface-hover)]',
+                        isInactive && 'opacity-65 hover:opacity-100 transition-opacity',
                         isBottleneck && 'bg-danger/5 hover:bg-danger/10'
                       )}
                     >
@@ -393,8 +406,37 @@ export const StationTable = memo(function StationTable({
                       <TableCell className="px-1 py-0.5 text-center tabular-nums text-muted-foreground">
                         {formatNumber(station.planOutput)}
                       </TableCell>
-                      <TableCell className="px-1 py-0.5 text-center tabular-nums font-medium text-foreground">
-                        {formatNumber(station.actualOutput)}
+                      <TableCell className="px-1 py-0.5 text-center tabular-nums text-foreground">
+                        {station.cumQty !== null &&
+                        station.cumQty !== undefined &&
+                        station.cumQty > 0 &&
+                        station.cumQty !== station.actualOutput ? (
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">
+                              <span
+                                className={cn(
+                                  isInactive
+                                    ? 'text-muted-foreground'
+                                    : 'font-medium underline decoration-dotted underline-offset-2'
+                                )}
+                              >
+                                {formatNumber(station.actualOutput)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <span>
+                                {copy.table.cumulativeWo ?? 'Lũy kế toàn WO'}:{' '}
+                                {formatNumber(station.cumQty)} PCS
+                              </span>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span
+                            className={cn(isInactive ? 'text-muted-foreground' : 'font-medium')}
+                          >
+                            {formatNumber(station.actualOutput)}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="px-1 py-0.5 text-center tabular-nums text-muted-foreground">
                         {formatNumber(station.targetUph)}
@@ -447,7 +489,25 @@ export const StationTable = memo(function StationTable({
                         <NgCell station={station} copy={copy} />
                       </TableCell>
                       <TableCell className="px-1.5 py-0.5 text-center">
-                        <StatusCell station={station} copy={copy} statusError={statusError} />
+                        {isInactive ? (
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">
+                              <span className="inline-flex items-center rounded-full border border-border px-1.5 py-0.5 text-[9px] font-normal text-muted-foreground">
+                                ⚪ {copy.table.inactive ?? 'Không chạy'}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <span>
+                                {station.cumQty
+                                  ? `${copy.table.inactiveTip ?? 'Trạm không phát sinh lượt quét trong ca này'} (${copy.table.cumulativeWo ?? 'Lũy kế'}: ${formatNumber(station.cumQty)} PCS)`
+                                  : (copy.table.inactiveTip ??
+                                    'Trạm không phát sinh lượt quét trong ca này')}
+                              </span>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <StatusCell station={station} copy={copy} statusError={statusError} />
+                        )}
                       </TableCell>
                     </TableRow>
                   );
