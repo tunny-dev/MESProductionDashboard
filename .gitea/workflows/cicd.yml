@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: mes-dashboard-production
+  group: mes-production-dashboard
   cancel-in-progress: false
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
         shell: powershell
 
     env:
-      SITE_NAME: 'MES_Dashboard'
+      SITE_NAME: 'MESProductionDashboard'
       DEPLOY_ROOT: 'D:\Senao\MESProductionDashboard'
       CI_ROOT: 'D:\Senao\CI\MESProductionDashboard'
       PUBLISH_DIR: 'D:\Senao\CI\MESProductionDashboard\publish'
