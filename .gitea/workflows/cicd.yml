@@ -233,8 +233,8 @@ jobs:
           New-Item -ItemType Directory -Force $backupRoot |
             Out-Null
 
-          $releaseName = (
-            Get-Content (Join-Path $ciRoot "ci_release_name.txt" -Raw)
+         $releaseName = (
+              Get-Content -LiteralPath (Join-Path $ciRoot "ci_release_name.txt") -Raw
           ).Trim()
 
           if ($releaseName -notmatch '^\d{8}_\d{6}_[0-9a-fA-F]+$') {
