@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'scripts']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -23,7 +23,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/app/router/**/*.{js,jsx}'],
+    files: ['src/core/router/**/*.{js,jsx}'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

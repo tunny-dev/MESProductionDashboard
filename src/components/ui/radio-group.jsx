@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Radio as RadioPrimitive, RadioGroup as BaseRadioGroup } from '@base-ui/react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/core/utils/utils';
 
 const RadioGroupContext = React.createContext({ value: undefined });
 

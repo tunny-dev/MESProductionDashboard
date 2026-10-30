@@ -10,7 +10,7 @@
  * `RefetchBar` — phủ màn mỗi 10 giây thì màn TV tối đen nhấp nháy.
  */
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/core/utils/utils';
 
 /** Vòng tròn quay, viền dày một phần ba. */
 export function Spinner({ className, label = 'Đang tải' }) {

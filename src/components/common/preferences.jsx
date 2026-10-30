@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Check, Globe, Laptop, Moon, Settings2, Sun, X } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/core/utils/utils';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,8 +21,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { changeLanguage, LANGUAGES } from '@/i18n';
-import { useTheme } from '@/hooks/use-theme';
+import { changeLanguage, LANGUAGES } from '@/core/i18n/i18n';
+import { useTheme } from '@/hooks/useTheme';
 
 export const ICON_TRIGGER =
   'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors outline-hidden hover:bg-foreground/5 hover:text-foreground';
