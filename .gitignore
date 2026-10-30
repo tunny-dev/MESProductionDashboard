@@ -84,3 +84,8 @@ design/
 db/
 scripts/
 .agents/
+
+# Storybook
+src/stories/
+*storybook.log
+storybook-static

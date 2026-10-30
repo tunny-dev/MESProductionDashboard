@@ -314,6 +314,8 @@
       "partNumber": "Part Number",
       "modelName": "Model",
       "planQty": "Plan qty",
+      "cumulative": "Cumulative",
+      "cumulativeWo": "WO Cumulative",
       "noWo": "No WO selected",
       "uphTargetMissing": "Not maintained",
       "uphTargetError": "Unavailable",
@@ -351,6 +353,10 @@
         "rate": "NG rate"
       },
       "status": "Status",
+      "inactive": "Inactive",
+      "inactiveTip": "No scans at this station in this shift",
+      "cumulative": "Cumulative",
+      "cumulativeWo": "Total WO Cumulative",
       "current": "In progress",
       "noStations": "No station data is available for this line.",
       "statusUnavailable": "Station status could not be loaded."

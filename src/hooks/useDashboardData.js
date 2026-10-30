@@ -16,16 +16,18 @@ import {
 import { SHIFT_CODES } from '@/constants/mesCodes';
 
 /**
- * Dựng Map<stationId, targetUph> từ rows CimCycleTime.
+ * Dựng Map<stationId, targetUph> từ rows CimCycleTime (hỗ trợ cả camelCase và PascalCase).
  * Tách ra để page không cần động vào cycleTime rows thô.
  */
 function buildCycleTimeTargetMap(cycleTimeRows) {
   const map = new Map();
   for (const row of cycleTimeRows ?? []) {
-    const stage = row?.stage;
-    const target = Number(row?.targetUph);
+    const stage = row?.stage ?? row?.Stage;
+    const target = Number(row?.targetUph ?? row?.TargetUph);
     if (stage != null && Number.isFinite(target) && target > 0) {
-      map.set(String(stage), target);
+      const stageStr = String(stage).trim();
+      map.set(stageStr, target);
+      map.set(stageStr.toUpperCase(), target);
     }
   }
   return map;
@@ -33,27 +35,50 @@ function buildCycleTimeTargetMap(cycleTimeRows) {
 
 /**
  * Patch `data` với UPH target fallback từ cycleTimeTargetMap.
- * - data.summary.targetUph: lấy từ static config nếu chưa có
+ * - data.stations[*].targetUph: patch từ cycleTimeTargetMap nếu thiếu
+ * - data.summary.targetUph: lấy từ trạm cuối hoặc static config nếu chưa có
  * - data.uphTrend[*].uphTarget: patch từ cycleTimeTargetMap nếu thiếu
  */
-function patchViewDataTargets(data, cycleTimeTargetMap, process, lineId) {
+function patchViewDataTargets(data, cycleTimeTargetMap, process, lineId, flowStations) {
   if (!data) return null;
+
+  const cumOutput =
+    Array.isArray(flowStations) && flowStations.length > 0
+      ? (flowStations.at(-1)?.qty ?? null)
+      : null;
+  const cumInput =
+    Array.isArray(flowStations) && flowStations.length > 0 ? (flowStations[0]?.qty ?? null) : null;
+
+  const getStationTarget = (id) => {
+    if (!id) return null;
+    const key = String(id).trim();
+    return cycleTimeTargetMap.get(key) ?? cycleTimeTargetMap.get(key.toUpperCase()) ?? null;
+  };
+
+  const patchedStations = (data.stations ?? []).map((st) => ({
+    ...st,
+    targetUph: st.targetUph ?? getStationTarget(st.stationId) ?? null,
+  }));
+
   const finalStationTarget =
-    (data.stations ?? []).at(-1)?.targetUph ??
-    cycleTimeTargetMap.get(String((data.stations ?? []).at(-1)?.stationId)) ??
+    patchedStations.at(-1)?.targetUph ??
+    getStationTarget(patchedStations.at(-1)?.stationId) ??
     null;
+
   const ctTarget = (stationId) =>
-    (data.stations ?? []).find((s) => s.stationId === stationId)?.targetUph ??
-    cycleTimeTargetMap.get(String(stationId)) ??
+    patchedStations.find((s) => s.stationId === stationId)?.targetUph ??
+    getStationTarget(stationId) ??
     null;
+
   return {
     ...data,
+    stations: patchedStations,
     summary: {
       ...data.summary,
+      cumOutput: cumOutput ?? data.summary?.cumOutput ?? null,
+      cumInput: cumInput ?? data.summary?.cumInput ?? null,
       targetUph:
-        data.summary.targetUph ??
-        (data.stations ?? []).at(-1)?.targetUph ??
-        getTargetUph({ process, line: lineId }),
+        data.summary.targetUph ?? finalStationTarget ?? getTargetUph({ process, line: lineId }),
     },
     uphTrend: (data.uphTrend ?? []).map((row) => ({
       ...row,
@@ -176,6 +201,10 @@ export function useDashboardData({
       flowQ.error,
       flowQ.isLoading,
       flowQ.isFetching,
+      cycleTimeQ.data,
+      cycleTimeQ.error,
+      cycleTimeQ.isLoading,
+      cycleTimeQ.isFetching,
       dateStr,
       dept,
       shiftCode,
@@ -250,8 +279,8 @@ export function useDashboardData({
   const cycleTimeTargetMap = useMemo(() => buildCycleTimeTargetMap(cycleTimeRows), [cycleTimeRows]);
 
   const viewData = useMemo(
-    () => patchViewDataTargets(data, cycleTimeTargetMap, process, lineId),
-    [data, cycleTimeTargetMap, process, lineId]
+    () => patchViewDataTargets(data, cycleTimeTargetMap, process, lineId, flowStations),
+    [data, cycleTimeTargetMap, process, lineId, flowStations]
   );
 
   return {

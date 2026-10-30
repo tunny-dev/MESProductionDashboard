@@ -312,6 +312,8 @@
       "partNumber": "料号",
       "modelName": "型号",
       "planQty": "计划数量",
+      "cumulative": "累计",
+      "cumulativeWo": "工单累计",
       "noWo": "未选择WO",
       "uphTargetMissing": "未维护",
       "uphTargetError": "无法加载",
@@ -349,6 +351,10 @@
         "rate": "NG 率"
       },
       "status": "状态",
+      "inactive": "未运行",
+      "inactiveTip": "本班次该工位无过站数据",
+      "cumulative": "累计",
+      "cumulativeWo": "工单总累计",
       "current": "进行中",
       "noStations": "此生产线暂无工站数据。",
       "statusUnavailable": "无法加载工站状态。"

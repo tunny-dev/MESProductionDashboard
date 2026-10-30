@@ -312,6 +312,8 @@
       "partNumber": "Part Number",
       "modelName": "Model",
       "planQty": "Kế hoạch",
+      "cumulative": "Lũy kế",
+      "cumulativeWo": "Lũy kế WO",
       "noWo": "Chưa chọn WO",
       "uphTargetMissing": "Chưa duy trì",
       "uphTargetError": "Chưa tải được",
@@ -349,6 +351,10 @@
         "rate": "Tỷ lệ NG"
       },
       "status": "Trạng thái",
+      "inactive": "Không chạy",
+      "inactiveTip": "Trạm không phát sinh lượt quét trong ca này",
+      "cumulative": "Lũy kế",
+      "cumulativeWo": "Lũy kế toàn WO",
       "current": "Đang chạy",
       "noStations": "Chưa có dữ liệu công đoạn cho chuyền này.",
       "statusUnavailable": "Chưa tải được trạng thái công đoạn."

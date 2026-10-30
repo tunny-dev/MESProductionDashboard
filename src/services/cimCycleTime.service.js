@@ -123,6 +123,8 @@ function buildBody(payload, creator) {
         : null,
     cycleTime:
       payload.cycleTime !== '' && payload.cycleTime != null ? toNum(payload.cycleTime) : null,
+    targetUph:
+      payload.targetUph !== '' && payload.targetUph != null ? toNum(payload.targetUph) : null,
     effectiveFrom: toText(payload.effectiveFrom),
     effectiveTo: toText(payload.effectiveTo) || '',
     creator: creator || '',
@@ -141,6 +143,7 @@ export function normalizeCctRows(rows) {
     peopleCount: r.peopleCount ?? null,
     stationCount: r.stationCount ?? null,
     cycleTime: r.cycleTime ?? null,
+    targetUph: r.targetUph ?? r.TargetUph ?? null,
     effectiveFrom: toText(r.effectiveFrom),
     effectiveTo: toText(r.effectiveTo),
     createdBy: toText(r.createdBy),

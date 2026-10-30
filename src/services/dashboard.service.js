@@ -211,6 +211,8 @@ export function normalizeWipReportRows(rows, slots) {
         firstAt: (r.firstAt ?? null) || null,
         lastAt: (r.lastAt ?? null) || null,
         stuckQty: toNum(r.stuckQty ?? r.stuckByStation),
+        cumQty: toNum(r.cumQty ?? r.cumOutput),
+        cumInput: toNum(r.cumInput),
         hourlyAchievement,
       };
     })

@@ -144,7 +144,18 @@ function MoInfoCard({ selectedWo, copy }) {
   );
 }
 
-function KpiCard({ icon: Icon, title, value, unit, detail, color, achievement, goal, copy }) {
+function KpiCard({
+  icon: Icon,
+  title,
+  value,
+  unit,
+  detail,
+  color,
+  achievement,
+  goal,
+  cumProgress,
+  copy,
+}) {
   const style = cardStyles[color];
   const achievementClass = achievement === undefined ? '' : getAchievementColor(achievement);
   const achievementTextClass = achievementClass
@@ -209,7 +220,9 @@ function KpiCard({ icon: Icon, title, value, unit, detail, color, achievement, g
             variant="outline"
             className="h-auto shrink-0 border-production-amber/30 bg-production-amber/10 px-1.5 py-0.5 text-[9px] text-warning-text"
           >
-            {copy.kpi.goal}: {formatNumber(goal)} PCS
+            {cumProgress !== null && cumProgress !== undefined
+              ? `${copy.kpi.cumulative ?? 'Lũy kế'}: ${formatPercent(cumProgress, 1)}`
+              : `${copy.kpi.goal}: ${formatNumber(goal)} PCS`}
           </Badge>
         </CardContent>
       ) : (
@@ -265,7 +278,9 @@ export const KpiCards = memo(function KpiCards({
       detail:
         showWoProgress && woSpan
           ? woSpan
-          : `${copy.kpi.plan}: ${formatNumber(summary.planOutput)} PCS`,
+          : summary.cumOutput && summary.cumOutput > summary.totalOutput
+            ? `${copy.kpi.cumulativeWo ?? 'Lũy kế WO'}: ${formatNumber(summary.cumOutput)} / ${formatNumber(summary.planOutput)} PCS`
+            : `${copy.kpi.plan}: ${formatNumber(summary.planOutput)} PCS`,
       color: 'green',
     },
     {
@@ -288,6 +303,10 @@ export const KpiCards = memo(function KpiCards({
       color: 'amber',
       achievement,
       goal: summary.planOutput,
+      cumProgress:
+        !showWoProgress && summary.cumOutput && summary.planOutput > 0
+          ? calculateAchievement(summary.cumOutput, summary.planOutput)
+          : null,
     },
   ];
 

@@ -33,27 +33,83 @@ export function buildStationRows({
   shiftEndDate,
   cycleTimeTargetMap,
   scopeId,
+  summary,
 }) {
   const statusNow = isViewingCurrentShift ? clockMinuteDate : shiftEndDate;
   const woMode = scopeId === 'WO' || scopeId === 'ROUTING';
 
-  if (apiStations.length > 0) {
-    return apiStations.map((station) => {
-      const name = station.opName || station.stationName || station.stationId;
+  // 1. Danh sách trạm chuẩn theo quy trình công nghệ (BOM/Flow) của chuyền / WO
+  const masterStations =
+    activeLineConfig?.stations?.length > 0
+      ? activeLineConfig.stations
+      : lineConfig?.stations?.length > 0
+        ? lineConfig.stations
+        : null;
+
+  if (masterStations && masterStations.length > 0) {
+    const metricsById = new Map((apiStations ?? []).map((s) => [s.stationId, s]));
+
+    return masterStations.map((stationConfig) => {
+      const configuredTargetUph = getStationTargetUph(lineConfig, model, stationConfig.id);
+      const metrics = metricsById.get(stationConfig.id) || null;
+      const stationId = stationConfig.id;
+      const name = stationConfig.name || stationConfig.shortName || stationId;
+      const cumQty = metrics?.cumQty ?? stationConfig.qty ?? metrics?.outputQty ?? null;
+      const defaultPlan = summary?.planOutput ?? summary?.planInput ?? null;
+
+      const targetUph = getTargetUph({
+        process,
+        line: metrics?.line ?? stationConfig.line ?? lineId,
+        op: stationId,
+        apiTarget:
+          metrics?.targetUph ??
+          cycleTimeTargetMap?.get(String(stationId)) ??
+          cycleTimeTargetMap?.get(String(stationId).toUpperCase()) ??
+          configuredTargetUph,
+      });
+
+      const stationData = metrics
+        ? {
+            ...stationConfig,
+            ...metrics,
+            id: stationId,
+            stationId,
+            name,
+            shortName: stationConfig.shortName || name,
+            targetUph,
+            cumQty,
+            planInput: metrics.planInput ?? defaultPlan,
+            planOutput: metrics.planOutput ?? defaultPlan,
+          }
+        : {
+            ...stationConfig,
+            id: stationId,
+            stationId,
+            name,
+            shortName: stationConfig.shortName || name,
+            opName: name,
+            stationName: name,
+            line: stationConfig.line ?? lineId,
+            actualInput: 0,
+            actualOutput: 0,
+            planInput: defaultPlan,
+            planOutput: defaultPlan,
+            firstPass: 0,
+            ngQty: 0,
+            rtQty: 0,
+            ngEvents: 0,
+            ngAll: 0,
+            ngRate: null,
+            uphActual: null,
+            hourlyAchievement: [null, null, null, null, null, null],
+            targetUph,
+            cumQty,
+          };
+
       return {
-        ...station,
-        id: station.stationId,
-        name,
-        shortName: name,
-        stationId: station.stationId,
-        targetUph: getTargetUph({
-          process,
-          line: station.line ?? lineId,
-          op: station.stationId,
-          apiTarget: station.targetUph ?? cycleTimeTargetMap.get(String(station.stationId)),
-        }),
+        ...stationData,
         ...(modelProfile?.uphAvailable === false ? { targetUph: null, actualUph: null } : {}),
-        status: getStationStatus(station, {
+        status: getStationStatus(stationData, {
           lastCompletedSlotIndex,
           isCurrentShift: isViewingCurrentShift,
           now: statusNow,
@@ -63,29 +119,26 @@ export function buildStationRows({
     });
   }
 
-  if (!activeLineConfig) return [];
-
-  const metricsById = new Map(apiStations.map((s) => [s.stationId, s]));
-  return activeLineConfig.stations.map((stationConfig) => {
-    const configuredTargetUph = getStationTargetUph(lineConfig, model, stationConfig.id);
-    const metrics = metricsById.get(stationConfig.id) || {};
-
+  // 2. Fallback nếu không có cấu hình trạm quy trình nào: hiển thị trực tiếp từ apiStations
+  return (apiStations ?? []).map((station) => {
+    const name = station.opName || station.stationName || station.stationId;
     return {
-      ...stationConfig,
-      ...metrics,
-      ...(configuredTargetUph !== undefined ? { targetUph: configuredTargetUph } : {}),
+      ...station,
+      id: station.stationId,
+      name,
+      shortName: name,
+      stationId: station.stationId,
       targetUph: getTargetUph({
         process,
-        line: metrics.line ?? lineId,
-        op: stationConfig.id,
+        line: station.line ?? lineId,
+        op: station.stationId,
         apiTarget:
-          metrics.targetUph ??
-          cycleTimeTargetMap.get(String(stationConfig.id)) ??
-          configuredTargetUph,
+          station.targetUph ??
+          cycleTimeTargetMap?.get(String(station.stationId)) ??
+          cycleTimeTargetMap?.get(String(station.stationId).toUpperCase()),
       }),
       ...(modelProfile?.uphAvailable === false ? { targetUph: null, actualUph: null } : {}),
-      stationId: stationConfig.id,
-      status: getStationStatus(metrics, {
+      status: getStationStatus(station, {
         lastCompletedSlotIndex,
         isCurrentShift: isViewingCurrentShift,
         now: statusNow,

@@ -35,6 +35,7 @@ const EMPTY_FORM = {
   peopleCount: '',
   stationCount: '',
   cycleTime: '',
+  targetUph: '',
   effectiveFrom: '',
   effectiveTo: '',
 };
@@ -51,6 +52,7 @@ function formFromRow(row) {
     peopleCount: row.peopleCount != null ? String(row.peopleCount) : '',
     stationCount: row.stationCount != null ? String(row.stationCount) : '',
     cycleTime: row.cycleTime != null ? String(row.cycleTime) : '',
+    targetUph: row.targetUph != null ? String(row.targetUph) : '',
     effectiveFrom: fmtDate(row.effectiveFrom),
     effectiveTo: fmtDate(row.effectiveTo),
   };
@@ -310,8 +312,38 @@ export function CimCycleTimeForm({ open, onOpenChange, editRow, isPending, onSub
               />
             </FormRow>
 
-            {/* placeholder để giữ layout 2 cột */}
-            <div />
+            {/* Target UPH */}
+            <FormRow label="Target UPH (PCS/H)" error={errors.targetUph}>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.targetUph}
+                  onChange={(e) => set('targetUph', e.target.value)}
+                  placeholder="Mục tiêu UPH (VD: 200)"
+                  aria-invalid={Boolean(errors.targetUph)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-xs text-muted-foreground hover:text-primary"
+                  title="Tính nhanh từ Cycle Time và People Count: CEILING(60 / (CT / NOP))"
+                  onClick={() => {
+                    const ct = parseFloat(form.cycleTime);
+                    const nop = parseInt(form.peopleCount, 10) || 1;
+                    if (ct > 0) {
+                      const eff = nop > 1 ? ct / nop : ct;
+                      const uph = Math.ceil(60.0 / eff);
+                      set('targetUph', String(uph));
+                    }
+                  }}
+                >
+                  Tính nhanh
+                </Button>
+              </div>
+            </FormRow>
 
             {/* Effective From — DatePicker */}
             <FormRow label="Effective From" required error={errors.effectiveFrom}>

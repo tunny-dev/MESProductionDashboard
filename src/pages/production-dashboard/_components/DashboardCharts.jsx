@@ -231,10 +231,9 @@ function OutputChart({
           label: slot.label,
           plannedOutput: isFuture ? null : (finalStationOutput?.plannedOutput ?? null),
           actualOutput: isFuture ? null : (finalStationOutput?.actualOutput ?? null),
-          // Khung chưa tới: chưa sản xuất = 0% để đường tỷ lệ vòng xuống 0 và
-          // chạy tiếp tới cuối ca, thay vì đứt ngang ở khung hiện tại.
+          // Khung chưa tới: null để đường tỷ lệ kết thúc ở khung hiện tại thay vì cắm thẳng xuống 0%
           achievement: isFuture
-            ? 0
+            ? null
             : (finalStationOutput?.achievement ??
               calculateAchievement(
                 finalStationOutput?.actualOutput,
