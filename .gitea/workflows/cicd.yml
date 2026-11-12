@@ -19,7 +19,7 @@ jobs:
         shell: powershell
 
     env:
-      SITE_NAME: 'MESProductionDashboard'
+      SITE_NAME: 'MESProductionDashboardClient'
       CLIENT_ROOT: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient'
       SHARED_DIR: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\shared'
       RELEASES_DIR: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\releases'
