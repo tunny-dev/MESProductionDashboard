@@ -1,6 +1,8 @@
 # MES Production Report
 
-Bảng sản lượng và Andon cho nhà máy. Frontend React gọi dữ liệu thô từ hệ thống MES qua `invoke?sCode=...`, tính toán và vẽ biểu đồ ở client.
+Bảng sản lượng và Andon cho nhà máy. Frontend React gọi **MES StoreProcedure API** (`POST /MES/invoke6?sCode=...`), tính toán và vẽ biểu đồ ở client.
+
+Mọi truy vấn đi qua một cửa duy nhất: `sCode` là khoá trong bảng `SERVICE_SQL` của DB `SFIS`, trỏ tới một stored procedure (`sql_service = 'stpquery'`) hoặc một câu SQL thô (`sql_service = 'query'`). Payload JSON gửi lên có key **camelCase trùng đúng tên tham số** của SP — xem `db/mes-invoke6-procedures.sql`.
 
 ## Tech stack
 
@@ -15,7 +17,9 @@ Bảng sản lượng và Andon cho nhà máy. Frontend React gọi dữ liệu 
 ## Yêu cầu
 
 - Node.js 20+ (khuyên dùng bản LTS mới nhất)
-- Truy cập được tới server MES (mặc định `http://172.17.209.2`)
+- Truy cập được tới máy MES (`http://localhost:8080`) — browser gọi thẳng
+- Máy MES bật CORS cho origin của FE (endpoint `/MES/auth` và `/MES/invoke6`)
+- Tài khoản MES (`POST /MES/auth`) để lấy Bearer token
 
 ## Bắt đầu nhanh
 
@@ -24,7 +28,7 @@ npm install
 
 # Tạo env cá nhân từ template
 Copy-Item .env.example .env.local
-# Mở .env.local và điền URL MES thật
+# Mở .env.local và sửa VITE_MES_URL nếu máy MES không ở localhost:8080
 
 npm run dev      # chạy dev
 npm run build    # build production -> dist/
@@ -35,14 +39,15 @@ Quy ước env: `.env` chứa giá trị mặc định (được commit), `.env.
 
 ## Route chính
 
-| Route                                | Màn hình                                          |
-| ------------------------------------ | ------------------------------------------------- |
-| `/`                                  | Trang chủ                                         |
-| `/overview`                          | Tổng quan sản xuất                                |
-| `/overview/line/:lineId`             | Chi tiết line                                     |
-| `/overview/chart`                    | Biểu đồ ngày                                      |
-| `/production-dashboard`              | Dashboard xưởng (cascade công đoạn → chuyền → WO) |
-| `/login`, `/forgot-password`, `/403` | Xác thực / phân quyền                             |
+| Route                                | Màn hình                                           |
+| ------------------------------------ | -------------------------------------------------- |
+| `/`                                  | Trang chủ                                          |
+| `/overview`                          | Tổng quan sản xuất                                 |
+| `/overview/line/:lineId`             | Chi tiết line                                      |
+| `/overview/chart`                    | Biểu đồ ngày                                       |
+| `/production-dashboard`              | Dashboard xưởng (cascade công đoạn → chuyền → WO)  |
+| `/wip-report`                        | WIP Report (Query / Summary / Unit S/N / Stations) |
+| `/login`, `/forgot-password`, `/403` | Xác thực / phân quyền                              |
 
 ## Cấu trúc dự án
 
@@ -50,85 +55,99 @@ Quy ước env: `.env` chứa giá trị mặc định (được commit), `.env.
 src/
 ├── app/                    # Shell, router, providers
 ├── pages/                  # Một route = một file
-├── config/api.js            # ★ MES_SYSTEMS + MES_S_CODES (thêm system/sCode ở đây)
+├── config/
+│   ├── api.js              # ★ MES_SYSTEMS + MES_S_CODES + mesInvokeUrl (thêm sCode ở đây)
+│   └── mes-codes.js        # Bảng tra mã UI → mã SQL (SHIFT_CODES)
 ├── lib/
-│   ├── mes-http.js          # ★ Factory axios cho MES invoke
-│   ├── unwrap-response.js   # Bóc mảng trần / envelope { data: [...] }
-│   └── logger.js            # Logger theo level + requestId
-├── server/mes-auth.js       # Proxy login MES (chỉ dùng ở dev, không bundle)
+│   ├── mes-http.js         # ★ Axios gọi invoke6: baseURL + Bearer + bóc lỗi MES
+│   │                       #   + mesRows()/mesRow() — đã unwrap sẵn
+│   ├── http.js             # Axios cho /MES/auth (đăng nhập)
+│   ├── unwrap-response.js  # unwrapList / unwrapObject
+│   ├── coerce.js           # toNum / toInt / toText — ép kiểu dữ liệu MES
+│   ├── date.js             # toCompactDate / toCompactDateOr (yyyyMMdd)
+│   └── logger.js           # Logger theo level + requestId
 └── features/
     ├── overview/           # Tổng quan: api, hooks, lib tính toán, components
-    └── production-dashboard/ # Dashboard xưởng: cascade + charts + station table
+    ├── production-dashboard/ # Dashboard xưởng: cascade + charts + station table
+    ├── wip-report/         # WIP Report: summary + pivot trạm + drill-down SN
+    └── auth/               # Login qua MES auth
 ```
 
 Chi tiết xem `docs/ARCHITECTURE.md`.
 
 ## Config môi trường
 
-Mỗi hệ thống MES có đúng 2 biến:
-
 ```text
-VITE_MES_<ID>_URL     — URL gốc server (không trailing slash)
-VITE_MES_<ID>_INVOKE  — số invoke = datasource trên server đó
+VITE_MES_URL          — URL gốc máy MES, browser gọi thẳng (vd http://localhost:8080)
+                        để TRỐNG = same-origin (khi đã có reverse proxy forward /MES)
+VITE_MES_INVOKE       — số invokeN (mặc định 6)
+VITE_DEFAULT_FACTORY  — mã nhà máy gửi trong `factory` (mặc định 'VN')
+VITE_LOG_LEVEL        — debug | info | warn | error | silent
+
+MES_PROXY_TARGET      — (server-only) đích proxy /MES lúc dev; chỉ dùng khi
+                        VITE_MES_URL để TRỐNG
 ```
 
 Ví dụ `.env.local`:
 
 ```dotenv
-VITE_MES_SFCS_URL=http://172.17.209.2
-VITE_MES_SFCS_INVOKE=6
-
-# Mã nhà máy gửi trong P_DC003 của GET_MFG_TYPE
-VITE_MES_FACTORY=VN
-
+VITE_MES_URL=http://localhost:8080
+VITE_MES_INVOKE=6
+VITE_DEFAULT_FACTORY=VN
 VITE_LOG_LEVEL=debug
-MES_AUTH_URL=http://172.17.209.2/MES/auth
+
+MES_PROXY_TARGET=http://localhost:8080
 ```
 
-Giải thích `invokeN`: backend MES có nhiều datasource song song, `/MES/invoke6` → datasource thứ 6. `VITE_MES_SFCS_INVOKE=6` nghĩa là system `sfcs` mặc định gọi `/MES/invoke6?sCode=...`.
+## Gọi API
 
-Danh mục công đoạn hiện dùng `GET_MFG_TYPE`:
+Mọi request đi qua `mesPost(sCode, body)` (`src/lib/mes-http.js`). Client tự:
+gắn `Authorization: Bearer <token>` từ auth store, gọi
+`POST {VITE_MES_URL}/MES/invoke6?sCode=<sCode>` với body JSON, và ném lỗi khi MES
+trả lỗi nghiệp vụ (MES luôn trả HTTP 200, lỗi nằm trong body dạng
+`[{ result: '@NG-@...' }]`).
 
-```text
-POST /MES/invoke6?sCode=GET_MFG_TYPE   body: { "P_DC003": "VN" }
-→ [{ "MfgCode": "VN001", "MfgType": "SMT", "Factory": "VN" }, ...]
-```
-
-Chuẩn hoá ở `features/overview/api/stages.js` thành `[{ id: 'SMT', deptCode: 'VN001', factory: 'VN' }]` — `id` để hiển thị, `deptCode` làm payload `MD004` cho `GET_PRODUCTION_LINE`.
-
-## Gọi API MES
+Khai sCode ở `src/config/api.js` rồi gọi. Dùng `mesRows` cho sCode trả **danh
+sách** và `mesRow` cho sCode trả **đúng 1 dòng** — hai hàm này đã `unwrapList` /
+`unwrapObject` sẵn:
 
 ```js
-import { mesGet, mesPost } from '@/lib/mes-http';
+import { mesRows, mesRow } from '@/lib/mes-http';
 import { MES_S_CODES } from '@/config/api';
 
-// System mặc định là sfcs
-const stages = await mesPost(MES_S_CODES.production.stages, { P_DC003: 'VN' });
+// POST + JSON body. Key camelCase = tên tham số SP.
+const rows = await mesRows(MES_S_CODES.wipReport.getWipModels, {
+  mfgType: 'VN001',
+  from: '20261001',
+  to: '20261016',
+  lines: 'D101',
+});
 
-// Chỉ định system
-const lot = await mesGet(MES_S_CODES.wip.lotStatus, { P_LOT_ID: 'L001' }, 'wip');
+const summary = await mesRow(MES_S_CODES.mo.getMoInfo, { mo: 'VI2-2690631S' });
 ```
 
-Thêm system mới — chỉ sửa `src/config/api.js`, không sửa `mes-http.js`:
+Nhóm sCode hiện có:
 
-```js
-// 1. Thêm vào MES_SYSTEMS
-erp: {
-  id: 'erp',
-  baseUrl: import.meta.env.VITE_MES_ERP_URL || '',
-  invokeN: Number(import.meta.env.VITE_MES_ERP_INVOKE ?? 3),
-  label: 'ERP',
-},
-// 2. Thêm sCode vào MES_S_CODES + 2 biến VITE_MES_ERP_URL/_INVOKE vào env
+```text
+stpquery  getMoSummary, getWipReport, getProductionAchievement, getUphTrend, getFlowByMo,
+          getProductionLineDetail, getWipSummary, getWipModels, getWipMos, getWipStation,
+          getWipStationSn, getWipUnitSn, getWipNotInputSn
+query     getMfgType, getProductionAreaList, getProductionLine, getMfgByLine,
+          getProductionShiftList, getProductionStopReasonList, getMoByLine, getMoInfo,
+          getModelByLine, getProductionSnapshot
 ```
 
-Override `invokeN` cho một call lẻ (cùng server nhưng sCode nằm ở datasource khác):
+### Gọi sang hệ thống MES khác
 
-```js
-await mesGet(MES_S_CODES.wh.stock, { P_WH: 'WH01' }, 'sfcs', { invokeN: 7 });
-```
+`MES_SYSTEMS` (`src/config/api.js`) khai từng hệ thống với `baseUrl` riêng; truyền
+`systemId` khi gọi: `mesPost(sCode, body, 'wip')`. Thêm hệ thống mới chỉ cần thêm
+một mục vào `MES_SYSTEMS` + biến `VITE_*_URL`.
 
-Ưu tiên: `options.invokeN` > `MES_SYSTEMS[system].invokeN`.
+### Ghi chú hiệu năng (DB)
+
+`SSFTA` là HEAP, chỉ có PK trên `(TA001, TA002, TA003)`. Mọi truy vấn lọc theo
+`TA005` (MO) / `TA008` (chuyền) / `TA003` (ngày) đều phải quét toàn bảng. Script
+`db/mes-invoke6-procedures.sql` có sẵn 2 index khuyến nghị ở cuối file.
 
 ## Scripts
 
@@ -138,34 +157,12 @@ await mesGet(MES_S_CODES.wh.stock, { P_WH: 'WH01' }, 'sfcs', { invokeN: 7 });
 | `npm run lint` / `lint:fix`            | ESLint kiểm tra / tự sửa                             |
 | `npm run format` / `format:check`      | Prettier ghi / kiểm tra                              |
 | `node scripts/verify-calc.mjs`         | 42 kiểm tra công thức (target, UPH, trạng thái line) |
-| `node scripts/verify-auth.mjs`         | Kiểm tra cổng login (cần dev server)                 |
 | `node scripts/verify-i18n-theme.mjs`   | Kiểm tra 3 ngôn ngữ + dark mode (cần dev server)     |
 | `node scripts/verify-error-page.mjs`   | Kiểm tra trang lỗi route                             |
 | `node scripts/verify-dashboard-ui.mjs` | Kiểm tra UI dashboard                                |
 
-Sửa công thức trong `production-calc.js` mà không chạy `verify-calc.mjs` thì dễ mang lỗi số liệu lên xưởng.
-
-## Git hooks
-
-Dùng Husky + lint-staged. Ai clone về chỉ cần `npm install` (script `prepare` tự gắn hook).
-
-- `.husky/pre-commit` → `npx lint-staged`
-- `lint-staged` trong `package.json`: `*.{js,jsx}` chạy `eslint --fix` + `prettier --write`
-
-## Log và xử lý lỗi
-
-- Log ra DevTools Console (`F12`), lọc `mes:` để chỉ xem log MES.
-- Mỗi request có `requestId` chung cho cặp request/response — đang gọi song song mà lỗi thì copy `error.requestId` vào ô Filter để tra.
-- MES luôn trả HTTP 200, lỗi nằm trong body → `mes-http.js` tự phát hiện và throw `error.isMesBusinessError === true`; mất mạng/timeout thì `error.status === 0`.
-
-Đổi level log không cần reload, chạy trong Console:
-
-```js
-import('@/lib/logger').then((m) => m.logger.setLevel('debug'));
-```
-
 ## Deploy
 
-- Dev (`npm run dev`): login qua middleware `mes-auth-dev` trong `vite.config.js` → `src/server/mes-auth.js` forward tới `MES_AUTH_URL`.
-- Production (IIS): `public/web.config` rewrite `/api/mes/auth` thẳng tới MES qua ARR, file `mes-auth.js` không được dùng.
-- Dữ liệu `invoke` không cần giấu credentials nên gọi trực tiếp từ browser bằng Bearer token sau login.
+- Browser gọi thẳng máy MES qua `VITE_MES_URL` → máy MES phải cho phép CORS cho origin của FE.
+- Nếu không muốn mở CORS: để `VITE_MES_URL` trống rồi cho reverse proxy (IIS ARR) forward `/MES` sang máy MES khi build production. Lúc dev, Vite dev server cũng proxy `/MES` → `MES_PROXY_TARGET` cho trường hợp này.
+- `public/web.config` chỉ còn SPA fallback.
