@@ -8,8 +8,19 @@ function Popover({ ...props }) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
-function PopoverTrigger({ ...props }) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
+function PopoverTrigger({ asChild, render, children, className, ...props }) {
+  const resolvedRender = asChild && !render && children ? children : render;
+  const resolvedChildren = asChild && !render ? undefined : children;
+  return (
+    <PopoverPrimitive.Trigger
+      data-slot="popover-trigger"
+      render={resolvedRender}
+      className={cn(className)}
+      {...props}
+    >
+      {resolvedChildren}
+    </PopoverPrimitive.Trigger>
+  );
 }
 
 function PopoverContent({

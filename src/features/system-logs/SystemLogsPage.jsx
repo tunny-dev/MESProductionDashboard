@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
-import { Layers, Terminal, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Layers, Terminal, ChevronLeft, ChevronRight, Activity, Laptop } from 'lucide-react';
 import { systemLogsService } from '@/services/system-logs.service';
 import { useSystemLogDates, useSystemLogTraces } from '@/hooks/useSystemLogs';
 import { CimdevAuthModal } from '@/features/system-logs/components/CimdevAuthModal';
@@ -10,13 +11,18 @@ import { TraceWaterfallItem } from '@/features/system-logs/components/TraceWater
 import { TraceDetailSheet } from '@/features/system-logs/components/TraceDetailSheet';
 import { LogStreamView } from '@/features/system-logs/components/LogStreamView';
 import { FilesModal } from '@/features/system-logs/components/FilesModal';
+import { ClientLogsTab } from '@/features/system-logs/components/ClientLogsTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { useTheme } from '@/hooks/useTheme';
 
 export function SystemLogsPage() {
+  const [searchParams] = useSearchParams();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === 'client' ? 'client' : 'waterfall'
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!systemLogsService.getStoredAuth());
   const [showAuthModal, setShowAuthModal] = useState(!isAuthenticated);
 
@@ -215,7 +221,15 @@ export function SystemLogsPage() {
         <div className="w-full px-4 py-4 sm:px-6 space-y-3.5">
           <TraceSummaryCards summary={summary} />
 
-          <TraceTimelineChart traces={traces} timeline={timeline} />
+          <TraceTimelineChart
+            traces={traces}
+            timeline={timeline}
+            onSelectBucket={(bucket) => {
+              if (bucket?.time) {
+                setSearch(bucket.time);
+              }
+            }}
+          />
 
           {error && (
             <div className="rounded border border-[#f2495c]/40 bg-[#f2495c]/10 p-3 text-xs text-[#f2495c] flex items-center justify-between">
@@ -231,7 +245,7 @@ export function SystemLogsPage() {
             </div>
           )}
 
-          <Tabs defaultValue="waterfall" className="space-y-2.5">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <TabsList className="dark:bg-[#181b1f] bg-white border dark:border-[#22252b] border-[#d8d9da] h-8 p-0.5 rounded shadow-sm">
                 <TabsTrigger
@@ -247,6 +261,13 @@ export function SystemLogsPage() {
                 >
                   <Terminal className="h-3.5 w-3.5 mr-1.5" />
                   Logs &amp; Table ({allEvents.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="client"
+                  className="text-xs h-7 rounded data-[state=active]:bg-[#3274d9] data-[state=active]:text-white dark:data-[state=active]:bg-[#22252b] dark:data-[state=active]:text-[#5794f2] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium"
+                >
+                  <Laptop className="h-3.5 w-3.5 mr-1.5" />
+                  Client FE Logs
                 </TabsTrigger>
               </TabsList>
 
@@ -356,6 +377,10 @@ export function SystemLogsPage() {
 
             <TabsContent value="raw" className="m-0">
               <LogStreamView events={allEvents} onInspect={handleOpenInspect} />
+            </TabsContent>
+
+            <TabsContent value="client" className="m-0">
+              <ClientLogsTab />
             </TabsContent>
           </Tabs>
         </div>

@@ -97,7 +97,6 @@ export const ScopeBar = memo(function ScopeBar({
                     type="button"
                     variant="outline"
                     size="icon-sm"
-                    asChild
                     className="size-7.5 shrink-0 border-production-blue/45 bg-production-blue/10 text-production-blue hover:bg-production-blue/20 hover:text-production-blue shadow-xs"
                   />
                 }

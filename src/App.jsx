@@ -18,6 +18,16 @@ export function App() {
     if (APP_CONFIG.title) {
       document.title = APP_CONFIG.title;
     }
+
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+        e.preventDefault();
+        router.navigate('/system-logs?tab=client');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (

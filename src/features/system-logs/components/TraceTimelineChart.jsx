@@ -1,24 +1,30 @@
 ﻿import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from 'recharts';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { useTheme } from '@/hooks/useTheme';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Activity, BarChart3, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-export function TraceTimelineChart({ traces = [], timeline = [] }) {
+const chartConfig = {
+  ok: {
+    label: '200 OK (Thành công)',
+    color: '#10b981', // Emerald
+  },
+  slow: {
+    label: 'Slow (≥ 1s)',
+    color: '#f59e0b', // Amber
+  },
+  error: {
+    label: 'Error (Lỗi)',
+    color: '#ef4444', // Red
+  },
+};
+
+export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme !== 'light';
+  const [chartType, setChartType] = useState('area'); // 'area' | 'bar'
 
-  // Group traces into time buckets (server-side timeline takes priority)
+  // Chuẩn hóa dữ liệu bucket
   const chartData = useMemo(() => {
     if (timeline && timeline.length > 0) {
       return timeline.map((b) => ({
@@ -27,7 +33,7 @@ export function TraceTimelineChart({ traces = [], timeline = [] }) {
         slow: b.slow || 0,
         error: b.error || 0,
         total: b.total || 0,
-        avgDuration: b.avgDurationMs || b.avgDuration || 0,
+        avgDuration: Math.round(b.avgDurationMs || b.avgDuration || 0),
       }));
     }
 
@@ -47,7 +53,6 @@ export function TraceTimelineChart({ traces = [], timeline = [] }) {
         return;
       }
 
-      // Group by 10-minute intervals
       const hours = String(d.getHours()).padStart(2, '0');
       const minutes = Math.floor(d.getMinutes() / 10) * 10;
       const bucketKey = `${hours}:${String(minutes).padStart(2, '0')}`;
@@ -80,122 +85,278 @@ export function TraceTimelineChart({ traces = [], timeline = [] }) {
       a.time.localeCompare(b.time)
     );
 
-    // Compute average duration per bucket
     return sortedBuckets.map((b) => ({
       ...b,
       avgDuration: b.total > 0 ? Math.round(b.totalDuration / b.total) : 0,
     }));
   }, [traces, timeline]);
 
+  // Thống kê tổng quan
+  const stats = useMemo(() => {
+    let total = 0;
+    let ok = 0;
+    let slow = 0;
+    let error = 0;
+
+    chartData.forEach((d) => {
+      total += d.total;
+      ok += d.ok;
+      slow += d.slow;
+      error += d.error;
+    });
+
+    const successRate = total > 0 ? (((ok + slow) / total) * 100).toFixed(1) : '100';
+    return { total, ok, slow, error, successRate };
+  }, [chartData]);
+
   if ((!traces || traces.length === 0) && (!timeline || timeline.length === 0)) return null;
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="rounded border dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 shadow-sm transition-all">
-        <div className="flex items-center justify-between pb-1.5 border-b dark:border-[#22252b] border-slate-200">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="flex items-center gap-1.5 text-xs font-semibold dark:text-[#f4f5f7] text-slate-800 hover:text-[#5794f2] transition cursor-pointer select-none"
-            >
-              {isCollapsed ? (
-                <ChevronDown className="h-3.5 w-3.5 text-[#8e94a0]" />
-              ) : (
-                <ChevronUp className="h-3.5 w-3.5 text-[#8e94a0]" />
-              )}
-              <span>Logs volume</span>
-            </button>
-            <span className="text-[11px] dark:text-[#8e94a0] text-slate-500 hidden sm:inline">
-              ({chartData.length} intervals)
-            </span>
+    <div className="rounded-xl border border-slate-200 dark:border-[#22252b] bg-white dark:bg-[#181b1f] shadow-sm overflow-hidden transition-all">
+      <div className="p-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#22252b]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="flex items-center gap-2 text-left group cursor-pointer focus:outline-none"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20 transition-colors">
+              <Activity className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 font-semibold text-sm text-slate-800 dark:text-slate-100">
+                <span>Logs Volume &amp; Activity Stream</span>
+                {isCollapsed ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                ) : (
+                  <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Lưu lượng truy cập và phân bổ trạng thái theo mốc thời gian
+              </p>
+            </div>
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <div className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-[#22252b] text-slate-700 dark:text-slate-300">
+              <span className="text-[10px] text-slate-400 mr-1 uppercase">Tổng</span>
+              <strong>{stats.total.toLocaleString()}</strong>
+            </div>
+            <div className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="text-[10px] opacity-75 mr-1 uppercase">Đạt</span>
+              <strong>{stats.successRate}%</strong>
+            </div>
+            {stats.error > 0 && (
+              <div className="px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/20">
+                <span className="text-[10px] opacity-75 mr-1 uppercase">Lỗi</span>
+                <strong>{stats.error}</strong>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-3 text-[11px] font-sans">
-              <span className="flex items-center gap-1.5 text-[#73bf69]">
-                <span className="h-2 w-2 rounded-full bg-[#73bf69]" /> 200 OK
-              </span>
-              <span className="flex items-center gap-1.5 text-[#faad14]">
-                <span className="h-2 w-2 rounded-full bg-[#faad14]" /> Slow (≥ 1s)
-              </span>
-              <span className="flex items-center gap-1.5 text-[#f2495c]">
-                <span className="h-2 w-2 rounded-full bg-[#f2495c]" /> Error
-              </span>
+          {!isCollapsed && (
+            <div className="flex items-center rounded-lg border border-slate-200 dark:border-[#2b2e35] p-0.5 bg-slate-50 dark:bg-[#14161a]">
+              <Button
+                size="sm"
+                variant={chartType === 'area' ? 'secondary' : 'ghost'}
+                onClick={() => setChartType('area')}
+                className={`h-6 px-2 text-xs gap-1 rounded-md ${
+                  chartType === 'area'
+                    ? 'bg-white dark:bg-[#22252b] shadow-xs font-semibold text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Layers className="h-3 w-3" />
+                Dải sóng (Area)
+              </Button>
+              <Button
+                size="sm"
+                variant={chartType === 'bar' ? 'secondary' : 'ghost'}
+                onClick={() => setChartType('bar')}
+                className={`h-6 px-2 text-xs gap-1 rounded-md ${
+                  chartType === 'bar'
+                    ? 'bg-white dark:bg-[#22252b] shadow-xs font-semibold text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <BarChart3 className="h-3 w-3" />
+                Cột (Bar)
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {!isCollapsed && (
+        <div className="p-3.5 sm:px-5">
+          <ChartContainer config={chartConfig} className="aspect-auto h-45 sm:h-55 w-full">
+            {chartType === 'area' ? (
+              <AreaChart
+                data={chartData}
+                margin={{ left: -16, right: 8, top: 10, bottom: 0 }}
+                onClick={(e) => {
+                  if (e?.activePayload?.[0]?.payload && onSelectBucket) {
+                    onSelectBucket(e.activePayload[0].payload);
+                  }
+                }}
+              >
+                <defs>
+                  <linearGradient id="fillOk" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillSlow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                  </linearGradient>
+                  <linearGradient id="fillError" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+
+                <XAxis
+                  dataKey="time"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                  allowDecimals={false}
+                />
+
+                <ChartTooltip
+                  cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }}
+                  content={
+                    <ChartTooltipContent
+                      indicator="dot"
+                      labelFormatter={(val, payload) => {
+                        const row = payload?.[0]?.payload;
+                        return (
+                          <div className="flex items-center justify-between gap-4 font-mono pb-1 border-b border-border/50">
+                            <span className="font-semibold text-cyan-500">Khung giờ: {val}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Độ trễ TB: {row?.avgDuration || 0}ms
+                            </span>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+
+                <Area
+                  dataKey="error"
+                  type="monotone"
+                  fill="url(#fillError)"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  stackId="a"
+                />
+                <Area
+                  dataKey="slow"
+                  type="monotone"
+                  fill="url(#fillSlow)"
+                  stroke="#f59e0b"
+                  strokeWidth={1.5}
+                  stackId="a"
+                />
+                <Area
+                  dataKey="ok"
+                  type="monotone"
+                  fill="url(#fillOk)"
+                  stroke="#10b981"
+                  strokeWidth={1.5}
+                  stackId="a"
+                />
+              </AreaChart>
+            ) : (
+              <BarChart
+                data={chartData}
+                margin={{ left: -16, right: 8, top: 10, bottom: 0 }}
+                onClick={(e) => {
+                  if (e?.activePayload?.[0]?.payload && onSelectBucket) {
+                    onSelectBucket(e.activePayload[0].payload);
+                  }
+                }}
+              >
+                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+
+                <XAxis
+                  dataKey="time"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                />
+
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 11 }}
+                  allowDecimals={false}
+                />
+
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      indicator="dot"
+                      labelFormatter={(val, payload) => {
+                        const row = payload?.[0]?.payload;
+                        return (
+                          <div className="flex items-center justify-between gap-4 font-mono pb-1 border-b border-border/50">
+                            <span className="font-semibold text-cyan-500">Khung giờ: {val}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Độ trễ TB: {row?.avgDuration || 0}ms
+                            </span>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+
+                <Bar dataKey="ok" fill="#10b981" stackId="a" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="slow" fill="#f59e0b" stackId="a" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="error" fill="#ef4444" stackId="a" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            )}
+          </ChartContainer>
+
+          <div className="flex items-center justify-center gap-5 mt-2 pt-2 border-t border-slate-100 dark:border-[#22252b] text-xs font-medium text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span>200 OK ({stats.ok.toLocaleString()})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+              <span>Chậm &ge; 1s ({stats.slow.toLocaleString()})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+              <span>Lỗi ({stats.error.toLocaleString()})</span>
             </div>
           </div>
         </div>
-
-        {!isCollapsed && (
-          <div className="mt-2 h-32 w-full pt-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 4, right: 10, left: -24, bottom: 0 }}>
-                <CartesianGrid
-                  strokeDasharray="2 2"
-                  stroke={isDark ? '#22252b' : '#e2e8f0'}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="time"
-                  stroke={isDark ? '#8e94a0' : '#94a3b8'}
-                  tick={{ fontSize: 10, fill: isDark ? '#8e94a0' : '#64748b' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  stroke={isDark ? '#8e94a0' : '#94a3b8'}
-                  tick={{ fontSize: 10, fill: isDark ? '#8e94a0' : '#64748b' }}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <RechartsTooltip
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white p-2.5 shadow-xl text-xs dark:text-[#f4f5f7] text-slate-800">
-                          <div className="font-sans font-bold text-[#5794f2] border-b dark:border-[#2c323f] border-slate-200 pb-1 mb-1.5">
-                            Time Window: {label}
-                          </div>
-                          <div className="space-y-0.5 font-sans text-[11px]">
-                            <div className="flex justify-between gap-4 text-[#73bf69]">
-                              <span>Success (200 OK):</span>
-                              <span className="font-bold">{data.ok}</span>
-                            </div>
-                            <div className="flex justify-between gap-4 text-[#faad14]">
-                              <span>Slow Queries:</span>
-                              <span className="font-bold">{data.slow}</span>
-                            </div>
-                            <div className="flex justify-between gap-4 text-[#f2495c]">
-                              <span>Errors:</span>
-                              <span className="font-bold">{data.error}</span>
-                            </div>
-                            <div className="flex justify-between gap-4 dark:text-[#c7d0d9] text-slate-700 border-t dark:border-[#2c323f] border-slate-200 pt-1 mt-1 font-semibold">
-                              <span>Total Requests:</span>
-                              <span>{data.total}</span>
-                            </div>
-                            <div className="flex justify-between gap-4 text-[#5794f2]">
-                              <span>Avg Latency:</span>
-                              <span>{data.avgDuration} ms</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="ok" stackId="a" fill="#73bf69" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="slow" stackId="a" fill="#faad14" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="error" stackId="a" fill="#f2495c" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-    </TooltipProvider>
+      )}
+    </div>
   );
 }
 
 TraceTimelineChart.propTypes = {
   traces: PropTypes.array,
   timeline: PropTypes.array,
+  onSelectBucket: PropTypes.func,
 };
