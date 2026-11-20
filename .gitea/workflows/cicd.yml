@@ -146,6 +146,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
+          # Tương thích Windows PowerShell 5.1: bỏ qua xác thực SSL
+          [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+
           $repo     = $env:REPO_NAME
           $baseUrl  = $env:GITEA_BASE_URL
           $headers  = @{
@@ -158,8 +161,7 @@ jobs:
           $tags = Invoke-RestMethod `
             -Method Get `
             -Uri $tagsUrl `
-            -Headers $headers `
-            -SkipCertificateCheck
+            -Headers $headers
 
           # Lọc tag dạng vX.Y.Z, lấy cái lớn nhất
           $semverTags = $tags |
@@ -210,8 +212,7 @@ jobs:
             -Method Post `
             -Uri "$baseUrl/api/v1/repos/$repo/releases" `
             -Headers $headers `
-            -Body $releaseBody `
-            -SkipCertificateCheck
+            -Body $releaseBody
 
           Write-Host "Release created: $($release.id)  -  $newTag"
 
@@ -223,8 +224,7 @@ jobs:
             -Uri $uploadUrl `
             -Headers @{ Authorization = "token $env:GITEA_TOKEN" } `
             -InFile $zipName `
-            -ContentType 'application/zip' `
-            -SkipCertificateCheck
+            -ContentType 'application/zip'
 
           Write-Host "Artifact uploaded: $zipName"
 
