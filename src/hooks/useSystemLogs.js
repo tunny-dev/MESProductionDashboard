@@ -41,6 +41,7 @@ export function useSystemLogTraces({
   onlySlow,
   onlySql,
   onlyInfo,
+  onlyWarn,
   page = 1,
   pageSize = 20,
   autoRefreshInterval = 0,
@@ -52,6 +53,9 @@ export function useSystemLogTraces({
   }
   if (onlyInfo && !effSearch.includes('Information')) {
     effSearch = effSearch ? `${effSearch} Information` : 'Information';
+  }
+  if (onlyWarn && !effSearch.includes('Warning')) {
+    effSearch = effSearch ? `${effSearch} Warning` : 'Warning';
   }
 
   const queryParams = {

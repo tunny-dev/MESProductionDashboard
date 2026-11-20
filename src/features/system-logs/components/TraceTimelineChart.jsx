@@ -22,7 +22,7 @@ const chartConfig = {
 
 export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [chartType, setChartType] = useState('area'); // 'area' | 'bar'
+  const [chartType, setChartType] = useState('bar'); // 'bar' | 'area' (default: 'bar')
 
   // Chuẩn hóa dữ liệu bucket
   const chartData = useMemo(() => {
@@ -113,14 +113,14 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-[#22252b] bg-white dark:bg-[#181b1f] shadow-sm overflow-hidden transition-all">
-      <div className="p-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#22252b]">
+      <div className="p-3.5 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-[#22252b]">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="flex items-center gap-2 text-left group cursor-pointer focus:outline-none"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20 transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3274d9]/10 text-[#5794f2] group-hover:bg-[#3274d9]/20 transition-colors">
               <Activity className="h-4 w-4" />
             </div>
             <div>
@@ -133,7 +133,7 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                 )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Lưu lượng truy cập và phân bổ trạng thái theo mốc thời gian
+                Traffic volume &amp; status breakdown over time &bull; Click bar to filter time
               </p>
             </div>
           </button>
@@ -142,16 +142,16 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
         <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs font-mono">
             <div className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-[#22252b] text-slate-700 dark:text-slate-300">
-              <span className="text-[10px] text-slate-400 mr-1 uppercase">Tổng</span>
+              <span className="text-[10px] text-slate-400 mr-1 uppercase">Total</span>
               <strong>{stats.total.toLocaleString()}</strong>
             </div>
             <div className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              <span className="text-[10px] opacity-75 mr-1 uppercase">Đạt</span>
+              <span className="text-[10px] opacity-75 mr-1 uppercase">Success</span>
               <strong>{stats.successRate}%</strong>
             </div>
             {stats.error > 0 && (
               <div className="px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/20">
-                <span className="text-[10px] opacity-75 mr-1 uppercase">Lỗi</span>
+                <span className="text-[10px] opacity-75 mr-1 uppercase">Error</span>
                 <strong>{stats.error}</strong>
               </div>
             )}
@@ -170,7 +170,7 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                 }`}
               >
                 <Layers className="h-3 w-3" />
-                Dải sóng (Area)
+                Area
               </Button>
               <Button
                 size="sm"
@@ -183,7 +183,7 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                 }`}
               >
                 <BarChart3 className="h-3 w-3" />
-                Cột (Bar)
+                Bar
               </Button>
             </div>
           )}
@@ -192,7 +192,10 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
 
       {!isCollapsed && (
         <div className="p-3.5 sm:px-5">
-          <ChartContainer config={chartConfig} className="aspect-auto h-45 sm:h-55 w-full">
+          <ChartContainer
+            config={chartConfig}
+            className="aspect-auto h-[185px] sm:h-[220px] w-full"
+          >
             {chartType === 'area' ? (
               <AreaChart
                 data={chartData}
@@ -285,6 +288,7 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
               <BarChart
                 data={chartData}
                 margin={{ left: -16, right: 8, top: 10, bottom: 0 }}
+                className="cursor-pointer"
                 onClick={(e) => {
                   if (e?.activePayload?.[0]?.payload && onSelectBucket) {
                     onSelectBucket(e.activePayload[0].payload);
@@ -317,9 +321,11 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                         const row = payload?.[0]?.payload;
                         return (
                           <div className="flex items-center justify-between gap-4 font-mono pb-1 border-b border-border/50">
-                            <span className="font-semibold text-cyan-500">Khung giờ: {val}</span>
+                            <span className="font-semibold text-[#3274d9] dark:text-[#5794f2]">
+                              Time: {val}
+                            </span>
                             <span className="text-[10px] text-muted-foreground">
-                              Độ trễ TB: {row?.avgDuration || 0}ms
+                              Avg Latency: {row?.avgDuration || 0}ms
                             </span>
                           </div>
                         );
@@ -328,25 +334,25 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                   }
                 />
 
-                <Bar dataKey="ok" fill="#10b981" stackId="a" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="slow" fill="#f59e0b" stackId="a" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="ok" fill="#10b981" stackId="a" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="slow" fill="#f59e0b" stackId="a" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="error" fill="#ef4444" stackId="a" radius={[3, 3, 0, 0]} />
               </BarChart>
             )}
           </ChartContainer>
 
-          <div className="flex items-center justify-center gap-5 mt-2 pt-2 border-t border-slate-100 dark:border-[#22252b] text-xs font-medium text-slate-600 dark:text-slate-400">
+          <div className="flex items-center justify-center gap-5 mt-2 pt-2 border-t border-slate-200 dark:border-[#22252b] text-xs font-medium text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
               <span>200 OK ({stats.ok.toLocaleString()})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span>Chậm &ge; 1s ({stats.slow.toLocaleString()})</span>
+              <span>Slow &ge; 1s ({stats.slow.toLocaleString()})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-              <span>Lỗi ({stats.error.toLocaleString()})</span>
+              <span>Error ({stats.error.toLocaleString()})</span>
             </div>
           </div>
         </div>

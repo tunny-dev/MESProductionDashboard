@@ -124,7 +124,7 @@ export function SqlQueryCard({
             className={`font-sans text-[11px] px-2 py-0.5 rounded border flex items-center gap-1 mr-1 ${
               evt.durationMs >= 1000
                 ? 'border-[#faad14]/40 text-[#faad14] bg-[#faad14]/10 font-bold'
-                : 'border-[#2c323f] dark:text-[#c7d0d9] text-slate-700 dark:bg-[#181b1f] bg-slate-50'
+                : 'dark:border-[#2c323f] border-slate-300 dark:text-[#c7d0d9] text-slate-700 dark:bg-[#181b1f] bg-slate-50'
             }`}
           >
             <Clock className="h-3 w-3" />
@@ -260,7 +260,7 @@ export function SqlQueryCard({
 
       {evt.sql && (
         <div
-          className={`relative rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-sans text-xs text-slate-200 leading-relaxed shadow-inner max-h-[500px] select-text ${getCodeClass()}`}
+          className={`relative rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed shadow-inner max-h-[500px] select-text ${getCodeClass()}`}
         >
           {renderHighlightedSql(evt.sql)}
         </div>
@@ -287,7 +287,7 @@ export function SqlQueryCard({
             </Tooltip>
           </div>
           <div
-            className={`block font-sans text-xs dark:bg-[#0c1017] bg-[#0c1017] text-slate-200 p-3 rounded-md border dark:border-[#22252b] border-slate-700 leading-relaxed select-text ${getCodeClass()}`}
+            className={`block font-mono text-xs dark:bg-[#0c1017] bg-[#0c1017] text-slate-200 p-3 rounded-md border dark:border-[#22252b] border-slate-700 leading-relaxed select-text ${getCodeClass()}`}
           >
             {renderHighlightedParams(evt.paramsJson)}
           </div>
@@ -385,7 +385,7 @@ export function SqlQueryCard({
                         value={filterText}
                         onChange={(e) => setFilterText(e.target.value)}
                         placeholder="Filter in results..."
-                        className="w-full pl-7 pr-2 py-1 text-xs rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white text-slate-200 placeholder-[#8e94a0] focus:outline-none focus:border-[#3274d9]"
+                        className="w-full pl-7 pr-2 py-1 text-xs rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white dark:text-slate-200 text-slate-900 placeholder-[#8e94a0] focus:outline-none focus:border-[#3274d9]"
                       />
                     </div>
                     <div className="text-[11px] text-[#8e94a0]">
@@ -404,10 +404,10 @@ export function SqlQueryCard({
                     </div>
                   ) : (
                     <div className="rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white overflow-auto max-h-[380px] shadow-inner">
-                      <table className="w-full text-left text-xs border-collapse font-sans">
+                      <table className="w-full text-left text-xs border-collapse">
                         <thead className="sticky top-0 z-10 dark:bg-[#181b1f] bg-slate-100 border-b dark:border-[#22252b] border-slate-300 shadow-sm">
                           <tr>
-                            <th className="p-2 text-[11px] font-bold text-[#8e94a0] border-r dark:border-[#22252b] border-slate-200 w-10 text-center">
+                            <th className="p-2 text-[11px] font-bold text-[#8e94a0] border-r dark:border-[#22252b] border-slate-200 w-10 text-center font-mono">
                               #
                             </th>
                             {result.columns.map((col) => (
@@ -424,9 +424,9 @@ export function SqlQueryCard({
                           {filteredRows.map((row, rIdx) => (
                             <tr
                               key={rIdx}
-                              className="hover:dark:bg-[#14161b] hover:bg-slate-50 transition-colors"
+                              className="hover:dark:bg-[#181b1f] hover:bg-slate-100 dark:even:bg-[#14161b]/40 even:bg-slate-50/50 transition-colors"
                             >
-                              <td className="p-2 text-[11px] text-[#8e94a0] font-sans text-center border-r dark:border-[#22252b] border-slate-200">
+                              <td className="p-2 text-[11px] text-[#8e94a0] font-mono tabular-nums text-center border-r dark:border-[#22252b] border-slate-200">
                                 {rIdx + 1}
                               </td>
                               {result.columns.map((col) => {
@@ -435,7 +435,7 @@ export function SqlQueryCard({
                                 return (
                                   <td
                                     key={col}
-                                    className="p-2 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 text-xs select-text font-sans"
+                                    className="p-2 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 text-xs select-text font-mono"
                                   >
                                     {isNull ? (
                                       <span className="text-[10px] text-[#8e94a0] italic bg-slate-800/40 px-1 py-0.5 rounded">
@@ -588,7 +588,7 @@ export function SqlQueryCard({
                         <summary className="hover:dark:text-white text-slate-400">
                           View raw SQL Server STATISTICS messages
                         </summary>
-                        <pre className="mt-1 p-2 rounded bg-black/40 text-[11px] font-sans text-slate-300 whitespace-pre-wrap overflow-x-auto">
+                        <pre className="mt-1 p-2 rounded bg-black/40 text-[11px] font-mono text-slate-300 whitespace-pre-wrap overflow-x-auto leading-relaxed border dark:border-[#22252b] border-slate-700">
                           {rawMessages}
                         </pre>
                       </details>
@@ -639,7 +639,7 @@ export function SqlQueryCard({
                     </div>
                   </div>
                   <div
-                    className={`rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-sans text-xs text-slate-200 leading-relaxed max-h-[380px] overflow-auto select-text ${getCodeClass()}`}
+                    className={`rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed max-h-[380px] overflow-auto select-text ${getCodeClass()}`}
                   >
                     {renderHighlightedSql(executableSql)}
                   </div>

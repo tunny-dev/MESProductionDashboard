@@ -41,6 +41,7 @@ export function SystemLogsPage() {
   const [onlySlow, setOnlySlow] = useState(false);
   const [onlySql, setOnlySql] = useState(false);
   const [onlyInfo, setOnlyInfo] = useState(false);
+  const [onlyWarn, setOnlyWarn] = useState(false);
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -96,6 +97,7 @@ export function SystemLogsPage() {
     onlySlow,
     onlySql,
     onlyInfo,
+    onlyWarn,
     page,
     pageSize,
     autoRefreshInterval,
@@ -206,6 +208,11 @@ export function SystemLogsPage() {
             setOnlyInfo(val);
             setPage(1);
           }}
+          onlyWarn={onlyWarn}
+          onOnlyWarnChange={(val) => {
+            setOnlyWarn(val);
+            setPage(1);
+          }}
           pageSize={pageSize}
           onPageSizeChange={handlePageSizeChange}
           onRefresh={refetchTraces}
@@ -227,9 +234,156 @@ export function SystemLogsPage() {
             onSelectBucket={(bucket) => {
               if (bucket?.time) {
                 setSearch(bucket.time);
+                setPage(1);
               }
             }}
           />
+
+          {(search ||
+            traceIdFilter ||
+            onlyErrors ||
+            onlySlow ||
+            onlyWarn ||
+            onlySql ||
+            onlyInfo) && (
+            <div className="flex items-center flex-wrap gap-2 text-xs py-2 px-3 rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white shadow-xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider dark:text-[#8e94a0] text-slate-500">
+                Active filters:
+              </span>
+              {search && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[#3274d9]/10 text-[#3274d9] dark:text-[#5794f2] border border-[#3274d9]/30">
+                  <span>
+                    Contains: <strong className="font-semibold">{search}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('');
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {traceIdFilter && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
+                  <span>
+                    Trace: <strong className="font-mono">{traceIdFilter.slice(0, 10)}...</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTraceIdFilter('');
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {onlyErrors && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[#f2495c]/10 text-[#f2495c] border border-[#f2495c]/30">
+                  <span>Errors only</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnlyErrors(false);
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {onlySlow && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[#faad14]/10 text-[#faad14] border border-[#faad14]/30">
+                  <span>Slow (≥1s) only</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnlySlow(false);
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {onlyWarn && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[#f2994a]/10 text-[#f2994a] border border-[#f2994a]/30">
+                  <span>Warning only</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnlyWarn(false);
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {onlySql && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[#73bf69]/10 text-[#73bf69] border border-[#73bf69]/30">
+                  <span>SQL queries only</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnlySql(false);
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {onlyInfo && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-[#5794f2]/10 text-[#5794f2] border border-[#5794f2]/30">
+                  <span>Info level only</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnlyInfo(false);
+                      setPage(1);
+                    }}
+                    className="hover:opacity-75 cursor-pointer text-xs"
+                    title="Remove filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setTraceIdFilter('');
+                  setOnlyErrors(false);
+                  setOnlySlow(false);
+                  setOnlyWarn(false);
+                  setOnlySql(false);
+                  setOnlyInfo(false);
+                  setPage(1);
+                }}
+                className="text-[11px] text-slate-400 hover:text-rose-500 hover:underline transition ml-auto cursor-pointer"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="rounded border border-[#f2495c]/40 bg-[#f2495c]/10 p-3 text-xs text-[#f2495c] flex items-center justify-between">
@@ -247,7 +401,7 @@ export function SystemLogsPage() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <TabsList className="dark:bg-[#181b1f] bg-white border dark:border-[#22252b] border-[#d8d9da] h-8 p-0.5 rounded shadow-sm">
+              <TabsList className="dark:bg-[#181b1f] bg-white border dark:border-[#22252b] border-slate-200 h-8 p-0.5 rounded shadow-sm">
                 <TabsTrigger
                   value="waterfall"
                   className="text-xs h-7 rounded data-[state=active]:bg-[#3274d9] data-[state=active]:text-white dark:data-[state=active]:bg-[#22252b] dark:data-[state=active]:text-[#5794f2] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium"
@@ -287,7 +441,7 @@ export function SystemLogsPage() {
                         variant="outline"
                         disabled={page <= 1 || loading}
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        className="h-7 px-2 dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white dark:text-[#c7d0d9] text-slate-700 disabled:opacity-40 rounded"
+                        className="h-7 px-2 dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white dark:text-[#c7d0d9] text-slate-700 hover:dark:bg-[#22252b] hover:bg-slate-50 disabled:opacity-40 rounded"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                       </Button>
@@ -302,7 +456,7 @@ export function SystemLogsPage() {
                         variant="outline"
                         disabled={page >= totalPages || loading}
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        className="h-7 px-2 dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white dark:text-[#c7d0d9] text-slate-700 disabled:opacity-40 rounded"
+                        className="h-7 px-2 dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white dark:text-[#c7d0d9] text-slate-700 hover:dark:bg-[#22252b] hover:bg-slate-50 disabled:opacity-40 rounded"
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
@@ -315,13 +469,13 @@ export function SystemLogsPage() {
 
             <TabsContent value="waterfall" className="m-0 space-y-2">
               {loading && displayedTraces.length === 0 ? (
-                <div className="rounded-xl border dark:border-slate-800 border-slate-200 dark:bg-[#0d1322] bg-white p-12 text-center dark:text-slate-400 text-slate-500 text-xs shadow-sm">
-                  <Activity className="h-6 w-6 animate-spin text-cyan-500 dark:text-cyan-400 mx-auto mb-2" />
+                <div className="rounded-xl border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-12 text-center dark:text-slate-400 text-slate-500 text-xs shadow-sm">
+                  <Activity className="h-6 w-6 animate-spin text-[#3274d9] dark:text-[#5794f2] mx-auto mb-2" />
                   Scanning and grouping APM Traces from structured log files...
                 </div>
               ) : displayedTraces.length === 0 ? (
-                <div className="rounded-xl border dark:border-slate-800 border-slate-200 dark:bg-[#0d1322] bg-white p-12 text-center text-slate-500 text-xs space-y-2 shadow-sm">
-                  <div className="dark:text-slate-400 text-slate-700 font-medium">
+                <div className="rounded-xl border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-12 text-center text-slate-500 text-xs space-y-2 shadow-sm">
+                  <div className="dark:text-slate-300 text-slate-700 font-medium">
                     No Trace records found.
                   </div>
                   <p className="text-[11px] text-slate-400">
@@ -330,7 +484,9 @@ export function SystemLogsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2.5">
+                <div
+                  className={`space-y-2.5 transition-opacity duration-200 ${loading ? 'opacity-70' : 'opacity-100'}`}
+                >
                   {displayedTraces.map((trace) => (
                     <TraceWaterfallItem
                       key={trace.traceId}
@@ -343,7 +499,7 @@ export function SystemLogsPage() {
               )}
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t dark:border-slate-800 border-slate-200 pt-3 text-xs dark:text-slate-400 text-slate-600">
+                <div className="flex items-center justify-between border-t dark:border-[#22252b] border-slate-200 pt-3 text-xs dark:text-slate-400 text-slate-600">
                   <span>
                     Showing {(page - 1) * pageSize + 1} -{' '}
                     {Math.min(page * pageSize, totalTracesCount)} of {totalTracesCount} Traces
@@ -354,11 +510,11 @@ export function SystemLogsPage() {
                       variant="outline"
                       disabled={page <= 1 || loading}
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="h-7 text-xs dark:border-slate-700 border-slate-300 dark:bg-slate-800 bg-white dark:text-slate-300 text-slate-700"
+                      className="h-7 text-xs dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white dark:text-[#c7d0d9] text-slate-700 hover:dark:bg-[#22252b] hover:bg-slate-50 rounded"
                     >
                       <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Previous
                     </Button>
-                    <span className="px-2 font-sans text-cyan-600 dark:text-cyan-400">
+                    <span className="px-2 font-sans font-medium text-[#3274d9] dark:text-[#5794f2]">
                       {page} / {totalPages}
                     </span>
                     <Button
@@ -366,7 +522,7 @@ export function SystemLogsPage() {
                       variant="outline"
                       disabled={page >= totalPages || loading}
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      className="h-7 text-xs dark:border-slate-700 border-slate-300 dark:bg-slate-800 bg-white dark:text-slate-300 text-slate-700"
+                      className="h-7 text-xs dark:border-[#2c323f] border-slate-300 dark:bg-[#181b1f] bg-white dark:text-[#c7d0d9] text-slate-700 hover:dark:bg-[#22252b] hover:bg-slate-50 rounded"
                     >
                       Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
                     </Button>

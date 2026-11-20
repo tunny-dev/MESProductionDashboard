@@ -41,6 +41,8 @@ export function TraceFilterToolbar({
   onOnlySqlChange,
   onlyInfo = false,
   onOnlyInfoChange,
+  onlyWarn = false,
+  onOnlyWarnChange,
   pageSize = 20,
   onPageSizeChange,
   onRefresh,
@@ -90,12 +92,13 @@ export function TraceFilterToolbar({
       id: 'all',
       label: 'All Logs',
       query: '{layer="all"}',
-      active: !onlyErrors && !onlySlow && !onlySql && !onlyInfo,
+      active: !onlyErrors && !onlySlow && !onlySql && !onlyInfo && !onlyWarn,
       onClick: () => {
         onOnlyErrorsChange(false);
         onOnlySlowChange(false);
         if (onOnlySqlChange) onOnlySqlChange(false);
         if (onOnlyInfoChange) onOnlyInfoChange(false);
+        if (onOnlyWarnChange) onOnlyWarnChange(false);
       },
     },
     {
@@ -128,9 +131,11 @@ export function TraceFilterToolbar({
       id: 'warn',
       label: '{level="warn"}',
       query: '{level="warning"}',
-      active: onlySlow,
+      active: !!onlyWarn,
       color: 'text-[#f2994a] border-[#f2994a]/40 bg-[#f2994a]/10 hover:bg-[#f2994a]/20',
-      onClick: () => onOnlySlowChange(!onlySlow),
+      onClick: () => {
+        if (onOnlyWarnChange) onOnlyWarnChange(!onlyWarn);
+      },
     },
     {
       id: 'info',
@@ -146,7 +151,7 @@ export function TraceFilterToolbar({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="sticky top-0 z-30 w-full rounded-none border-b dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f]/98 bg-white/98 backdrop-blur-md px-4 py-2.5 sm:px-6 shadow-sm transition-colors space-y-3">
+      <div className="sticky top-0 z-30 w-full rounded-none border-b dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f]/98 bg-white/98 backdrop-blur-md px-4 py-2.5 sm:px-6 shadow-sm transition-colors space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b dark:border-[#22252b] border-slate-200 pb-2.5">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-[#f4f5f7]">
@@ -282,7 +287,7 @@ export function TraceFilterToolbar({
                         type="button"
                         className="relative flex items-center gap-1.5 rounded-full ring-1 dark:ring-[#2c323f] ring-slate-300 hover:ring-[#3274d9] transition cursor-pointer p-0.5 ml-1"
                       >
-                        <Avatar className="h-7 w-7 border border-[#2c323f]">
+                        <Avatar className="h-7 w-7 border dark:border-[#2c323f] border-slate-300">
                           <AvatarFallback className="bg-gradient-to-tr from-[#3274d9] to-blue-700 text-white font-bold text-[11px]">
                             AD
                           </AvatarFallback>
@@ -306,33 +311,22 @@ export function TraceFilterToolbar({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-4 flex gap-2 justify-end">
-                  <AlertDialogCancel
-                    render={
-                      <Button
-                        variant="outline"
-                        className="dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-100 dark:text-slate-300 text-slate-700"
-                      >
-                        Cancel
-                      </Button>
-                    }
-                  />
+                  <AlertDialogCancel className="dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-100 dark:text-slate-300 text-slate-700">
+                    Cancel
+                  </AlertDialogCancel>
                   <AlertDialogAction
-                    render={
-                      <Button
-                        onClick={onLogout}
-                        className="bg-rose-600 hover:bg-rose-500 text-white"
-                      >
-                        Sign Out
-                      </Button>
-                    }
-                  />
+                    onClick={onLogout}
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-medium"
+                  >
+                    Sign Out
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </div>
         </div>
 
-        <div className="rounded border dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 space-y-2.5 shadow-sm">
+        <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 space-y-2.5 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] dark:text-[#8e94a0] text-slate-500 mr-1 select-none font-medium">
               Label filters:
@@ -366,18 +360,23 @@ export function TraceFilterToolbar({
                 onChange={(e) => setQueryDraft(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Text to find (SQL query, parameters, URL path, WO, Model, Exception, or Trace ID)..."
-                className="pl-8 pr-8 h-7 text-xs font-sans dark:bg-[#111217] bg-slate-50 dark:border-[#2c323f] border-slate-300 dark:text-white text-slate-900 placeholder:text-slate-500 focus-visible:border-[#3274d9] rounded"
+                className="pl-8 pr-20 h-7 text-xs font-sans dark:bg-[#111217] bg-slate-50 dark:border-[#2c323f] border-slate-300 dark:text-white text-slate-900 placeholder:text-slate-500 focus-visible:border-[#3274d9] rounded"
               />
-              {queryDraft && (
-                <button
-                  onClick={handleClearQuery}
-                  type="button"
-                  className="absolute right-2.5 top-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-                  title="Clear input"
-                >
-                  ✕
-                </button>
-              )}
+              <div className="absolute right-2 top-1.5 flex items-center gap-1.5">
+                {queryDraft && (
+                  <button
+                    onClick={handleClearQuery}
+                    type="button"
+                    className="h-4 w-4 rounded-full flex items-center justify-center text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                    title="Clear input"
+                  >
+                    ✕
+                  </button>
+                )}
+                <kbd className="hidden sm:inline-block px-1.5 py-0.2 text-[9px] font-sans text-slate-400 border border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800 select-none">
+                  ↵ Enter
+                </kbd>
+              </div>
             </div>
           </div>
         </div>
@@ -402,6 +401,8 @@ TraceFilterToolbar.propTypes = {
   onOnlySqlChange: PropTypes.func,
   onlyInfo: PropTypes.bool,
   onOnlyInfoChange: PropTypes.func,
+  onlyWarn: PropTypes.bool,
+  onOnlyWarnChange: PropTypes.func,
   pageSize: PropTypes.number,
   onPageSizeChange: PropTypes.func.isRequired,
   onRefresh: PropTypes.func.isRequired,

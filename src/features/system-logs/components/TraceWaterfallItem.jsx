@@ -81,7 +81,7 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
             ? 'border-[#f2495c]/40 dark:bg-[#181b1f] bg-rose-50/70'
             : isSlow
               ? 'border-[#faad14]/40 dark:bg-[#181b1f] bg-amber-50/70'
-              : 'dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white hover:dark:border-[#2c323f] hover:border-slate-300 shadow-sm'
+              : 'dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white hover:dark:border-[#2c323f] hover:border-slate-300 shadow-xs'
         }`}
       >
         <div
@@ -212,11 +212,11 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
         </div>
 
         {expanded && (
-          <div className="border-t dark:border-slate-800/80 border-slate-200 dark:bg-[#090e18]/80 bg-slate-50 p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs dark:text-slate-400 text-slate-500 pb-2 border-b dark:border-slate-800/50 border-slate-200">
-              <span>Waterfall Progress ({events.length} events):</span>
-              <span className="font-sans text-[11px]">
-                IP: {clientIp || '127.0.0.1'} | {timestamp}
+          <div className="border-t dark:border-[#22252b] border-slate-200 dark:bg-[#14161a] bg-slate-50/70 p-4 space-y-3">
+            <div className="flex items-center justify-between text-xs dark:text-slate-400 text-slate-500 pb-2 border-b dark:border-[#22252b] border-slate-200">
+              <span className="font-medium">Waterfall Progress ({events.length} events):</span>
+              <span className="font-sans text-[11px] dark:text-slate-400 text-slate-500">
+                IP: {clientIp || '127.0.0.1'} &bull; {timestamp}
               </span>
             </div>
 
@@ -238,14 +238,14 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
                 return (
                   <div
                     key={idx}
-                    className="rounded-lg border dark:border-slate-800/70 border-slate-200 dark:bg-[#0c1322] bg-white p-3 text-xs transition hover:dark:border-slate-700 hover:border-slate-300 shadow-sm"
+                    className="rounded-lg border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 text-xs transition hover:dark:border-[#2c323f] hover:border-slate-300 shadow-xs"
                   >
                     <div className="flex items-center justify-between gap-3 text-slate-400 mb-1.5">
                       <div className="flex items-center gap-2">
                         <span className="font-sans text-[11px] text-slate-500">
                           {formatTime(evt.time)}
                         </span>
-                        <span className="font-sans text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">
+                        <span className="font-sans text-[11px] text-[#3274d9] dark:text-[#5794f2] font-semibold">
                           +{offset}ms
                         </span>
                         <span
@@ -257,7 +257,7 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
                                 : isEventError
                                   ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
                                   : isHttpEnd
-                                    ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30'
+                                    ? 'bg-[#3274d9]/20 text-[#5794f2] border border-[#3274d9]/30'
                                     : 'dark:bg-slate-800 bg-slate-100 text-slate-500'
                           }`}
                         >
@@ -272,7 +272,7 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
                       )}
                     </div>
 
-                    <div className="relative h-1.5 w-full rounded-full dark:bg-slate-800/60 bg-slate-200 overflow-hidden mb-2">
+                    <div className="relative h-1.5 w-full rounded-full dark:bg-[#111217] bg-slate-200 overflow-hidden mb-2">
                       <div
                         className={`absolute h-full rounded-full ${
                           isSlowSql
@@ -281,7 +281,7 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
                               ? 'bg-rose-500'
                               : isSql
                                 ? 'bg-emerald-400'
-                                : 'bg-cyan-400'
+                                : 'bg-[#5794f2]'
                         }`}
                         style={{
                           left: `${leftPercent}%`,
@@ -298,7 +298,7 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
 
                     {isSql && evt.sql && (
                       <div className="mt-2.5 space-y-2">
-                        <div className="relative rounded-lg border dark:border-cyan-500/20 border-cyan-500/30 dark:bg-[#060a12] bg-slate-900 p-3 font-sans text-[11px] text-cyan-300 overflow-x-auto whitespace-pre-wrap">
+                        <div className="relative rounded border dark:border-[#2c323f] border-slate-700 dark:bg-[#111217] bg-slate-900 p-3 font-sans text-[11px] text-[#5794f2] dark:text-cyan-300 overflow-x-auto whitespace-pre-wrap">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
@@ -323,11 +323,11 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
                         </div>
 
                         {evt.paramsJson && (
-                          <div className="rounded-lg border dark:border-slate-800 border-slate-300 dark:bg-[#090f1d] bg-slate-100 p-2.5">
+                          <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-slate-100 p-2.5">
                             <span className="text-[10px] font-bold uppercase text-slate-500 mr-2">
                               Parameters:
                             </span>
-                            <code className="font-sans text-xs dark:text-amber-200/90 text-amber-800 break-all">
+                            <code className="font-sans text-xs dark:text-amber-300 text-amber-700 break-all">
                               {evt.paramsJson}
                             </code>
                           </div>
@@ -336,8 +336,8 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
                     )}
 
                     {evt.exception && (
-                      <div className="mt-2.5 rounded-lg border border-rose-500/30 dark:bg-rose-950/20 bg-rose-50 p-3 font-sans text-xs text-rose-500 dark:text-rose-300 whitespace-pre-wrap">
-                        <div className="font-bold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1.5">
+                      <div className="mt-2.5 rounded border border-[#f2495c]/30 dark:bg-[#f2495c]/10 bg-rose-50/80 p-3 font-sans text-xs text-[#f2495c] whitespace-pre-wrap">
+                        <div className="font-bold text-[#f2495c] mb-1 flex items-center gap-1.5">
                           <AlertCircle className="h-3.5 w-3.5" />
                           Exception Details:
                         </div>

@@ -212,7 +212,7 @@ export function ClientLogsTab() {
             placeholder="Tìm kiếm theo event, url API, mã lỗi..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 pl-8 text-xs border-slate-300 dark:border-[#2b2e35] dark:bg-[#181b1f] bg-white"
+            className="h-8 pl-8 text-xs border-slate-300 dark:border-[#2c323f] dark:bg-[#181b1f] bg-white"
           />
         </div>
 
@@ -222,10 +222,10 @@ export function ClientLogsTab() {
             <button
               key={lvl}
               onClick={() => setSelectedLevel(lvl)}
-              className={`h-7 px-2.5 rounded text-xs font-medium border transition-colors capitalize shrink-0 ${
+              className={`h-7 px-2.5 rounded text-xs font-medium border transition-colors capitalize shrink-0 cursor-pointer ${
                 selectedLevel === lvl
-                  ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm'
-                  : 'dark:bg-[#181b1f] bg-white dark:border-[#2b2e35] border-slate-200 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#22252b]'
+                  ? 'bg-[#3274d9] text-white border-[#3274d9] shadow-xs'
+                  : 'dark:bg-[#181b1f] bg-white dark:border-[#2c323f] border-slate-200 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#22252b]'
               }`}
             >
               {lvl === 'all' ? 'Tất cả' : lvl.toUpperCase()}
@@ -237,7 +237,7 @@ export function ClientLogsTab() {
           <select
             value={selectedNs}
             onChange={(e) => setSelectedNs(e.target.value)}
-            className="h-8 text-xs rounded border border-slate-300 dark:border-[#2b2e35] dark:bg-[#181b1f] bg-white px-2 text-slate-700 dark:text-slate-200 focus:outline-none"
+            className="h-8 text-xs rounded border border-slate-300 dark:border-[#2c323f] dark:bg-[#181b1f] bg-white px-2 text-slate-700 dark:text-slate-200 focus:outline-none"
           >
             <option value="all">Mọi phân hệ ({namespaces.length})</option>
             {namespaces.map((ns) => (
@@ -264,7 +264,7 @@ export function ClientLogsTab() {
               : 'Không tìm thấy log nào khớp với bộ lọc hiện tại.'}
           </div>
         ) : (
-          <div className="divide-y dark:divide-[#22252b] divide-slate-100 font-mono text-xs max-h-150 overflow-y-auto">
+          <div className="divide-y dark:divide-[#22252b] divide-slate-100 font-mono text-xs max-h-[600px] overflow-y-auto">
             {filteredLogs.map((item, idx) => {
               const uniqueKey = item.id || `${item.ts}-${idx}`;
               const isExpanded = expandedIds.has(uniqueKey);

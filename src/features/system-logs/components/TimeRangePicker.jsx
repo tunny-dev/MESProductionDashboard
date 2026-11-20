@@ -358,13 +358,13 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
 
   return (
     <div className="relative inline-flex items-center">
-      <div className="button-group inline-flex items-stretch rounded border border-[#c7d0d9] dark:border-[#2c323f] bg-[#e9ecef] dark:bg-[#181b1f] shadow-sm select-none h-8">
+      <div className="button-group inline-flex items-stretch rounded border border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] shadow-xs select-none h-8">
         <button
           type="button"
           onClick={handleStepBackward}
           title="Move time range backwards"
           aria-label="Move time range backwards"
-          className="h-8 px-2.5 flex items-center justify-center border-r border-[#c7d0d9] dark:border-[#2c323f] bg-[#e9ecef] dark:bg-[#181b1f] hover:bg-[#dfe3e7] hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
+          className="h-8 px-2.5 flex items-center justify-center border-r border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
         >
           <AngleDoubleLeftIcon className="w-4 h-4" />
         </button>
@@ -385,7 +385,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
               <button
                 type="button"
                 aria-label={`Time range selected: ${activeLabel}`}
-                className="h-8 px-3 flex items-center gap-2 border-r border-[#c7d0d9] dark:border-[#2c323f] bg-[#dfe3e8] dark:bg-[#181b1f] hover:bg-[#d5dbe2] hover:dark:bg-[#22252b] text-slate-900 dark:text-[#f4f5f7] font-medium text-xs transition cursor-pointer"
+                className="h-8 px-3 flex items-center gap-2 border-r border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-900 dark:text-[#f4f5f7] font-medium text-xs transition cursor-pointer"
               >
                 <ClockNineIcon className="w-4 h-4 text-slate-700 dark:text-[#c7d0d9]" />
                 <span className="font-semibold text-xs tracking-tight">{activeLabel}</span>
@@ -652,7 +652,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
           onClick={handleStepForward}
           title="Move time range forwards"
           aria-label="Move time range forwards"
-          className="h-8 px-2.5 flex items-center justify-center border-r border-[#c7d0d9] dark:border-[#2c323f] bg-[#e9ecef] dark:bg-[#181b1f] hover:bg-[#dfe3e7] hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
+          className="h-8 px-2.5 flex items-center justify-center border-r border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
         >
           <AngleDoubleRightIcon className="w-4 h-4" />
         </button>
@@ -662,7 +662,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
           onClick={handleZoomOut}
           title="Zoom out time range"
           aria-label="Zoom out time range"
-          className="h-8 px-2.5 flex items-center justify-center bg-[#e9ecef] dark:bg-[#181b1f] hover:bg-[#dfe3e7] hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
+          className="h-8 px-2.5 flex items-center justify-center bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
         >
           <SearchMinusIcon className="w-4 h-4" />
         </button>

@@ -15,17 +15,20 @@ export function TraceSummaryCards({ summary = {} }) {
 
   const effSlowQueries = totalSlowQueries ?? slowQueries ?? 0;
 
-  // Calculate volume distribution percentage
+  // Calculate volume distribution percentage safely
   const totalWeight = Math.max(totalTraces, 1);
-  const errorPercent = Math.min((totalErrors / totalWeight) * 100, 100);
-  const slowPercent = Math.min((effSlowQueries / totalWeight) * 100, 100 - errorPercent);
-  const normalPercent = Math.max(100 - errorPercent - slowPercent, 0);
+  const errCount = Math.min(totalErrors, totalTraces);
+  const slowCount = Math.min(effSlowQueries, Math.max(0, totalTraces - errCount));
+  const okCount = Math.max(totalTraces - errCount - slowCount, 0);
+  const errorPercent = totalTraces > 0 ? (errCount / totalWeight) * 100 : 0;
+  const slowPercent = totalTraces > 0 ? (slowCount / totalWeight) * 100 : 0;
+  const normalPercent = totalTraces > 0 ? (okCount / totalWeight) * 100 : 100;
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Card className="dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 transition hover:dark:border-[#2c323f] hover:border-slate-300 shadow-sm rounded">
+          <Card className="dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 transition-all duration-200 hover:dark:border-[#2c323f] hover:border-slate-300 hover:shadow-sm shadow-xs rounded">
             <CardContent className="p-0 flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider dark:text-[#8e94a0] text-slate-500">
@@ -41,7 +44,7 @@ export function TraceSummaryCards({ summary = {} }) {
             </CardContent>
           </Card>
 
-          <Card className="dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 transition hover:dark:border-[#2c323f] hover:border-slate-300 shadow-sm rounded">
+          <Card className="dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 transition-all duration-200 hover:dark:border-[#2c323f] hover:border-slate-300 hover:shadow-sm shadow-xs rounded">
             <CardContent className="p-0 flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider dark:text-[#8e94a0] text-slate-500">
@@ -57,7 +60,7 @@ export function TraceSummaryCards({ summary = {} }) {
             </CardContent>
           </Card>
 
-          <Card className="dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 transition hover:dark:border-[#2c323f] hover:border-slate-300 shadow-sm rounded">
+          <Card className="dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 transition-all duration-200 hover:dark:border-[#2c323f] hover:border-slate-300 hover:shadow-sm shadow-xs rounded">
             <CardContent className="p-0 flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider dark:text-[#8e94a0] text-slate-500">
@@ -77,7 +80,7 @@ export function TraceSummaryCards({ summary = {} }) {
             </CardContent>
           </Card>
 
-          <Card className="dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 transition hover:dark:border-[#2c323f] hover:border-slate-300 shadow-sm rounded">
+          <Card className="dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 transition-all duration-200 hover:dark:border-[#2c323f] hover:border-slate-300 hover:shadow-sm shadow-xs rounded">
             <CardContent className="p-0 flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider dark:text-[#8e94a0] text-slate-500">
@@ -97,7 +100,7 @@ export function TraceSummaryCards({ summary = {} }) {
             </CardContent>
           </Card>
 
-          <Card className="dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 transition hover:dark:border-[#2c323f] hover:border-slate-300 shadow-sm col-span-2 sm:col-span-1 rounded">
+          <Card className="dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 transition-all duration-200 hover:dark:border-[#2c323f] hover:border-slate-300 hover:shadow-sm shadow-xs col-span-2 sm:col-span-1 rounded">
             <CardContent className="p-0 flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider dark:text-[#8e94a0] text-slate-500">
@@ -116,7 +119,7 @@ export function TraceSummaryCards({ summary = {} }) {
         </div>
 
         {totalTraces > 0 && (
-          <div className="rounded border dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-2.5 flex items-center gap-3 shadow-sm">
+          <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-2.5 flex items-center gap-3 shadow-xs">
             <span className="text-[11px] dark:text-[#8e94a0] text-slate-500 font-sans shrink-0 uppercase font-medium">
               Distribution Ratio:
             </span>

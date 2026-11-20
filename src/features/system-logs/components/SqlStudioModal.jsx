@@ -24,6 +24,8 @@ import {
   RefreshCw,
   Globe,
   Hash,
+  ArrowUpDown,
+  Wand2,
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -56,6 +58,74 @@ function exportToCsv(columns, rows, filename = 'sql_result.csv') {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function uppercaseSqlKeywords(sql) {
+  if (!sql) return '';
+  const keywords = [
+    'SELECT',
+    'FROM',
+    'WHERE',
+    'AND',
+    'OR',
+    'NOT',
+    'INSERT',
+    'INTO',
+    'UPDATE',
+    'SET',
+    'DELETE',
+    'JOIN',
+    'INNER JOIN',
+    'LEFT JOIN',
+    'RIGHT JOIN',
+    'CROSS JOIN',
+    'ON',
+    'GROUP BY',
+    'ORDER BY',
+    'ASC',
+    'DESC',
+    'HAVING',
+    'TOP',
+    'DISTINCT',
+    'AS',
+    'WITH',
+    'NOLOCK',
+    'UNION',
+    'ALL',
+    'CASE',
+    'WHEN',
+    'THEN',
+    'ELSE',
+    'END',
+    'IS',
+    'NULL',
+    'LIKE',
+    'IN',
+    'EXISTS',
+    'BETWEEN',
+    'EXEC',
+    'EXECUTE',
+    'DECLARE',
+    'OUTPUT',
+    'INSERTED',
+    'DELETED',
+  ];
+  let res = sql;
+  keywords.forEach((kw) => {
+    const re = new RegExp(`\\b${kw}\\b`, 'gi');
+    res = res.replace(re, kw);
+  });
+  return res;
+}
+
+function prettifyJsonParams(jsonStr) {
+  if (!jsonStr) return '';
+  try {
+    const obj = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    return jsonStr;
+  }
 }
 
 export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = [], trace = {} }) {
@@ -533,22 +603,32 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                     <ResizablePanel
                       defaultSize={68}
                       minSize={30}
-                      className="flex flex-col min-h-0 p-3 dark:bg-[#0c1017] bg-[#0c1017]"
+                      className="flex flex-col min-h-0 p-3 dark:bg-[#0c1017] bg-slate-950"
                     >
                       <div className="flex items-center justify-between text-[11px] font-bold text-[#8e94a0] uppercase mb-1.5 shrink-0">
                         <span className="flex items-center gap-1.5">
                           <Code2 className="h-3.5 w-3.5 text-[#5794f2]" /> T-SQL Query (SELECT /
                           DECLARE only)
                         </span>
-                        <span className="text-[10px] text-slate-500 font-normal">
-                          Editable sandbox
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditedSql(uppercaseSqlKeywords(editedSql))}
+                            className="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition cursor-pointer flex items-center gap-1 font-mono"
+                            title="Format T-SQL keywords to UPPERCASE"
+                          >
+                            <Wand2 className="h-3 w-3 text-cyan-400" /> UPPERCASE
+                          </button>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {editedSql.split('\n').length} lines &bull; {editedSql.length} chars
+                          </span>
+                        </div>
                       </div>
                       <textarea
                         value={editedSql}
                         onChange={(e) => setEditedSql(e.target.value)}
                         placeholder="Enter SELECT query with parameters..."
-                        className="flex-1 w-full p-2 text-xs font-sans dark:text-slate-100 text-slate-100 bg-transparent resize-none focus:outline-none leading-relaxed select-text placeholder-slate-600 border dark:border-[#22252b]/80 border-slate-800 rounded"
+                        className="flex-1 w-full p-2.5 text-xs font-mono dark:text-slate-100 text-slate-100 bg-[#070a0e] resize-none focus:outline-none focus:ring-1 focus:ring-[#3274d9]/60 leading-relaxed select-text placeholder-slate-600 border dark:border-[#22252b] border-slate-800 rounded"
                         spellCheck={false}
                       />
                     </ResizablePanel>
@@ -558,22 +638,32 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                     <ResizablePanel
                       defaultSize={32}
                       minSize={20}
-                      className="flex flex-col min-h-0 p-3 dark:bg-[#0c1017] bg-[#0c1017]"
+                      className="flex flex-col min-h-0 p-3 dark:bg-[#0c1017] bg-slate-950"
                     >
                       <div className="flex items-center justify-between text-[11px] font-bold text-[#8e94a0] uppercase mb-1.5 shrink-0">
                         <span className="flex items-center gap-1.5">
                           <SlidersHorizontal className="h-3.5 w-3.5 text-[#faad14]" /> Parameters
                           (JSON)
                         </span>
-                        <span className="text-[10px] text-slate-500 font-normal">
-                          {`{"@param": "val"}`}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditedParams(prettifyJsonParams(editedParams))}
+                            className="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition cursor-pointer flex items-center gap-1 font-mono"
+                            title="Prettify JSON parameter object"
+                          >
+                            <Wand2 className="h-3 w-3 text-amber-400" /> Format
+                          </button>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {`{"@param": "val"}`}
+                          </span>
+                        </div>
                       </div>
                       <textarea
                         value={editedParams}
                         onChange={(e) => setEditedParams(e.target.value)}
                         placeholder='{"@mo": "012345"}'
-                        className="flex-1 w-full p-2 text-xs font-sans dark:text-[#faad14] text-amber-300 bg-transparent resize-none focus:outline-none leading-relaxed select-text placeholder-slate-600 border dark:border-[#22252b]/80 border-slate-800 rounded"
+                        className="flex-1 w-full p-2.5 text-xs font-mono dark:text-amber-300 text-amber-300 bg-[#070a0e] resize-none focus:outline-none focus:ring-1 focus:ring-[#faad14]/60 leading-relaxed select-text placeholder-slate-600 border dark:border-[#22252b] border-slate-800 rounded"
                         spellCheck={false}
                       />
                     </ResizablePanel>
@@ -658,14 +748,24 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                     <div className="flex-1 flex flex-col min-h-0 p-3 space-y-2">
                       <div className="flex items-center justify-between gap-2 shrink-0">
                         <div className="relative flex-1 max-w-sm">
-                          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-[#8e94a0]" />
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-[#8e94a0]" />
                           <input
                             type="text"
                             value={filterText}
                             onChange={(e) => setFilterText(e.target.value)}
                             placeholder="Search across all returned cells..."
-                            className="w-full pl-8 pr-3 py-1 text-xs rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white text-slate-100 placeholder-[#8e94a0] focus:outline-none focus:border-[#3274d9]"
+                            className="w-full pl-8 pr-8 py-1.5 text-xs rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#0c1017] bg-white dark:text-slate-100 text-slate-900 placeholder-[#8e94a0] focus:outline-none focus:border-[#3274d9] shadow-xs"
                           />
+                          {filterText && (
+                            <button
+                              type="button"
+                              onClick={() => setFilterText('')}
+                              className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                              title="Clear filter"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                         {result && (
                           <div className="text-[11px] text-[#8e94a0] font-sans">
@@ -692,11 +792,11 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                           No rows match the search query &quot;{filterText}&quot;.
                         </div>
                       ) : (
-                        <div className="flex-1 rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white overflow-auto shadow-inner">
+                        <div className="flex-1 rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#0c1017] bg-white overflow-auto shadow-xs">
                           <table className="w-full text-left text-xs border-collapse font-sans">
-                            <thead className="sticky top-0 z-10 dark:bg-[#181b1f] bg-slate-100 border-b dark:border-[#22252b] border-slate-300 shadow-sm">
+                            <thead className="sticky top-0 z-10 dark:bg-[#181b1f] bg-slate-100 border-b dark:border-[#22252b] border-slate-200 shadow-xs">
                               <tr>
-                                <th className="p-2 text-[11px] font-bold text-[#8e94a0] border-r dark:border-[#22252b] border-slate-200 w-10 text-center">
+                                <th className="py-2 px-3 text-[11px] font-bold text-[#8e94a0] border-r dark:border-[#22252b] border-slate-200 w-12 text-center bg-inherit">
                                   #
                                 </th>
                                 {result.columns.map((col) => {
@@ -705,14 +805,16 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                                     <th
                                       key={col}
                                       onClick={() => handleSort(col)}
-                                      className="p-2 text-[11px] font-bold dark:text-[#f4f5f7] text-slate-700 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 cursor-pointer select-none hover:bg-black/10 transition-colors"
+                                      className="py-2 px-3 text-[11px] font-bold dark:text-[#f4f5f7] text-slate-700 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 cursor-pointer select-none hover:bg-black/5 dark:hover:bg-white/5 transition-colors bg-inherit"
                                     >
                                       <div className="flex items-center gap-1.5">
                                         <span>{col}</span>
-                                        {isSorted && (
+                                        {isSorted ? (
                                           <span className="text-[#3274d9] font-bold">
                                             {sortConfig.direction === 'asc' ? '↑' : '↓'}
                                           </span>
+                                        ) : (
+                                          <ArrowUpDown className="h-2.5 w-2.5 opacity-25" />
                                         )}
                                       </div>
                                     </th>
@@ -720,13 +822,13 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                                 })}
                               </tr>
                             </thead>
-                            <tbody className="divide-y dark:divide-[#22252b] divide-slate-200">
+                            <tbody className="divide-y dark:divide-[#22252b] divide-slate-100">
                               {filteredAndSortedRows.map((row, rIdx) => (
                                 <tr
                                   key={rIdx}
-                                  className="hover:dark:bg-[#14161b] hover:bg-slate-50 transition-colors"
+                                  className="hover:dark:bg-[#1e2229] hover:bg-slate-100/70 transition-colors dark:even:bg-[#14161b]/40 even:bg-slate-50/50"
                                 >
-                                  <td className="p-2 text-[11px] text-[#8e94a0] font-sans text-center border-r dark:border-[#22252b] border-slate-200">
+                                  <td className="py-1.5 px-3 text-[11px] text-[#8e94a0] font-mono text-center border-r dark:border-[#22252b] border-slate-200 select-none">
                                     {rIdx + 1}
                                   </td>
                                   {result.columns.map((col) => {
@@ -735,10 +837,10 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                                     return (
                                       <td
                                         key={col}
-                                        className="p-2 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 text-xs select-text font-sans"
+                                        className="py-1.5 px-3 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 text-xs select-text font-mono"
                                       >
                                         {isNull ? (
-                                          <span className="text-[10px] text-[#8e94a0] italic bg-slate-800/40 px-1 py-0.5 rounded">
+                                          <span className="text-[10px] text-slate-400 dark:text-[#8e94a0] italic dark:bg-slate-800/40 bg-slate-200/80 px-1.5 py-0.5 rounded font-mono">
                                             NULL
                                           </span>
                                         ) : (
@@ -840,41 +942,61 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                               </tr>
                             </thead>
                             <tbody className="divide-y dark:divide-[#22252b] divide-slate-100">
-                              {stats.tables.map((t, tIdx) => (
-                                <tr
-                                  key={tIdx}
-                                  className="hover:dark:bg-[#181b1f]/50 hover:bg-slate-50"
-                                >
-                                  <td className="p-2.5 font-semibold dark:text-white text-slate-900">
-                                    {t.tableName}
-                                  </td>
-                                  <td className="p-2.5 text-right font-sans">
-                                    <span
-                                      className={
-                                        t.scanCount > 1
-                                          ? 'text-[#faad14] font-bold'
-                                          : 'dark:text-[#c7d0d9] text-slate-700'
-                                      }
-                                    >
-                                      {t.scanCount}
-                                    </span>
-                                  </td>
-                                  <td className="p-2.5 text-right font-sans">
-                                    <span
-                                      className={
-                                        t.logicalReads > 500
-                                          ? 'text-[#faad14] font-bold'
-                                          : 'text-[#73bf69]'
-                                      }
-                                    >
-                                      {t.logicalReads.toLocaleString()}
-                                    </span>
-                                  </td>
-                                  <td className="p-2.5 text-right font-sans dark:text-[#8e94a0] text-slate-500">
-                                    {t.physicalReads}
-                                  </td>
-                                </tr>
-                              ))}
+                              {stats.tables.map((t, tIdx) => {
+                                const maxReads = Math.max(
+                                  ...stats.tables.map((x) => x.logicalReads || 0),
+                                  1
+                                );
+                                const readPercent = Math.min(
+                                  ((t.logicalReads || 0) / maxReads) * 100,
+                                  100
+                                );
+                                return (
+                                  <tr
+                                    key={tIdx}
+                                    className="hover:dark:bg-[#181b1f]/50 hover:bg-slate-50"
+                                  >
+                                    <td className="p-2.5 font-semibold dark:text-white text-slate-900 font-mono">
+                                      {t.tableName}
+                                    </td>
+                                    <td className="p-2.5 text-right font-sans">
+                                      <span
+                                        className={
+                                          t.scanCount > 1
+                                            ? 'text-[#faad14] font-bold'
+                                            : 'dark:text-[#c7d0d9] text-slate-700'
+                                        }
+                                      >
+                                        {t.scanCount}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono tabular-nums">
+                                      <div className="flex flex-col items-end gap-1">
+                                        <span
+                                          className={
+                                            t.logicalReads > 500
+                                              ? 'text-[#faad14] font-bold'
+                                              : 'text-[#73bf69]'
+                                          }
+                                        >
+                                          {t.logicalReads.toLocaleString()}
+                                        </span>
+                                        <div className="w-24 h-1 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                          <div
+                                            className={`h-full rounded-full transition-all ${
+                                              t.logicalReads > 500 ? 'bg-[#faad14]' : 'bg-[#73bf69]'
+                                            }`}
+                                            style={{ width: `${readPercent}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono tabular-nums dark:text-[#8e94a0] text-slate-500">
+                                      {t.physicalReads}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -890,7 +1012,7 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                           <summary className="hover:dark:text-white">
                             View raw TDS STATISTICS messages
                           </summary>
-                          <pre className="mt-2 p-3 rounded bg-black/50 text-[11px] font-sans text-slate-300 whitespace-pre-wrap overflow-x-auto">
+                          <pre className="mt-2 p-3 rounded bg-black/50 text-[11px] font-mono text-slate-300 whitespace-pre-wrap overflow-x-auto leading-relaxed border dark:border-[#22252b] border-slate-700">
                             {rawMessages}
                           </pre>
                         </details>
@@ -939,7 +1061,7 @@ export function SqlStudioModal({ isOpen, onClose, initialIndex = 0, sqlEvents = 
                           </Button>
                         </div>
                       </div>
-                      <pre className="flex-1 rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-sans text-xs text-slate-200 leading-relaxed overflow-auto select-text">
+                      <pre className="flex-1 rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed overflow-auto select-text">
                         {executableSql}
                       </pre>
                     </div>

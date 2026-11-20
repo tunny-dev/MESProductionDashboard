@@ -458,25 +458,25 @@ export function TraceDetailSheet({ trace, isOpen, onClose }) {
           </SheetHeader>
 
           <Tabs defaultValue="sql" className="flex-1 flex flex-col min-h-0">
-            <div className="border-b dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-slate-100 px-5 pt-2">
-              <TabsList className="dark:bg-[#181b1f] bg-white border dark:border-[#22252b] border-slate-200 h-9 p-0.5 rounded">
+            <div className="border-b dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-slate-50 px-5 pt-2">
+              <TabsList className="dark:bg-[#181b1f] bg-white border dark:border-[#22252b] border-slate-200 h-9 p-0.5 rounded shadow-xs">
                 <TabsTrigger
                   value="sql"
-                  className="text-xs data-[state=active]:bg-[#22252b] data-[state=active]:text-white dark:data-[state=active]:text-[#f4f5f7] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium"
+                  className="text-xs h-7.5 rounded data-[state=active]:bg-[#3274d9] data-[state=active]:text-white dark:data-[state=active]:bg-[#22252b] dark:data-[state=active]:text-[#5794f2] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium transition"
                 >
                   <Database className="h-3.5 w-3.5 mr-1.5 text-[#5794f2]" />
                   Database Queries ({sqlEvents.length})
                 </TabsTrigger>
                 <TabsTrigger
                   value="labels"
-                  className="text-xs data-[state=active]:bg-[#22252b] data-[state=active]:text-white dark:data-[state=active]:text-[#f4f5f7] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium"
+                  className="text-xs h-7.5 rounded data-[state=active]:bg-[#3274d9] data-[state=active]:text-white dark:data-[state=active]:bg-[#22252b] dark:data-[state=active]:text-[#5794f2] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium transition"
                 >
                   <Activity className="h-3.5 w-3.5 mr-1.5 text-[#73bf69]" />
                   Trace Labels ({Object.keys(trace).length})
                 </TabsTrigger>
                 <TabsTrigger
                   value="raw"
-                  className="text-xs data-[state=active]:bg-[#22252b] data-[state=active]:text-white dark:data-[state=active]:text-[#f4f5f7] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium"
+                  className="text-xs h-7.5 rounded data-[state=active]:bg-[#3274d9] data-[state=active]:text-white dark:data-[state=active]:bg-[#22252b] dark:data-[state=active]:text-[#5794f2] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium transition"
                 >
                   <FileText className="h-3.5 w-3.5 mr-1.5 text-[#faad14]" />
                   Raw Stream ({events.length})

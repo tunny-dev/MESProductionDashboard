@@ -19,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 
 export function LogStreamView({ events = [], onInspect }) {
@@ -119,7 +120,7 @@ export function LogStreamView({ events = [], onInspect }) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-2 rounded border dark:border-[#22252b] border-[#d8d9da] dark:bg-[#181b1f] bg-white p-3 shadow-sm transition-colors">
+      <div className="space-y-2 rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 shadow-xs transition-colors">
         <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b dark:border-[#22252b] border-slate-200">
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-100 p-0.5">
@@ -128,7 +129,7 @@ export function LogStreamView({ events = [], onInspect }) {
                 onClick={() => setDisplayMode('logs')}
                 className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition cursor-pointer ${
                   displayMode === 'logs'
-                    ? 'dark:bg-[#22252b] bg-white text-[#3274d9] dark:text-white shadow-sm font-semibold'
+                    ? 'dark:bg-[#22252b] bg-white text-[#3274d9] dark:text-[#5794f2] shadow-xs font-semibold'
                     : 'text-slate-500 hover:text-slate-900 dark:text-[#8e94a0] dark:hover:text-slate-200'
                 }`}
               >
@@ -140,7 +141,7 @@ export function LogStreamView({ events = [], onInspect }) {
                 onClick={() => setDisplayMode('table')}
                 className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition cursor-pointer ${
                   displayMode === 'table'
-                    ? 'dark:bg-[#22252b] bg-white text-[#3274d9] dark:text-white shadow-sm font-semibold'
+                    ? 'dark:bg-[#22252b] bg-white text-[#3274d9] dark:text-[#5794f2] shadow-xs font-semibold'
                     : 'text-slate-500 hover:text-slate-900 dark:text-[#8e94a0] dark:hover:text-slate-200'
                 }`}
               >
@@ -162,7 +163,7 @@ export function LogStreamView({ events = [], onInspect }) {
                 value={consoleSearch}
                 onChange={(e) => setConsoleSearch(e.target.value)}
                 placeholder="Search in log lines..."
-                className="pl-7 h-7 w-44 sm:w-56 text-[11px] dark:bg-slate-900 bg-slate-50 dark:border-slate-800 border-slate-200 dark:text-slate-200 text-slate-900 placeholder:text-slate-400"
+                className="pl-7 h-7 w-44 sm:w-56 text-[11px] dark:bg-[#111217] bg-slate-50 dark:border-[#2c323f] border-slate-300 dark:text-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#3274d9]"
               />
             </div>
 
@@ -172,9 +173,9 @@ export function LogStreamView({ events = [], onInspect }) {
                   size="sm"
                   variant="outline"
                   onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-                  className="h-7 text-xs dark:border-slate-700 border-slate-300 dark:bg-slate-800/80 bg-slate-50 dark:text-slate-300 text-slate-700 hover:text-slate-900 dark:hover:text-white"
+                  className="h-7 text-xs dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 dark:text-[#c7d0d9] text-slate-700 hover:text-slate-900 dark:hover:text-white"
                 >
-                  <ArrowUpDown className="h-3 w-3 mr-1 text-cyan-500 dark:text-cyan-400" />
+                  <ArrowUpDown className="h-3 w-3 mr-1 text-[#3274d9] dark:text-[#5794f2]" />
                   {sortOrder === 'desc' ? 'Newest logs first' : 'Oldest logs first'}
                 </Button>
               </TooltipTrigger>
@@ -195,10 +196,10 @@ export function LogStreamView({ events = [], onInspect }) {
                     className={`h-7 text-xs border transition ${
                       tableWrap
                         ? 'dark:border-amber-500/50 border-amber-400 dark:bg-amber-500/10 bg-amber-50 text-amber-600 dark:text-amber-400 font-medium'
-                        : 'dark:border-slate-700 border-slate-300 dark:bg-slate-800/80 bg-slate-50 dark:text-slate-300 text-slate-700'
+                        : 'dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 dark:text-[#c7d0d9] text-slate-700'
                     }`}
                   >
-                    <WrapText className="h-3 w-3 mr-1 text-cyan-500 dark:text-cyan-400" />
+                    <WrapText className="h-3 w-3 mr-1 text-[#3274d9] dark:text-[#5794f2]" />
                     <span>{tableWrap ? 'Wrapping enabled' : 'Wrapping disabled'}</span>
                   </Button>
                 </TooltipTrigger>
@@ -217,9 +218,9 @@ export function LogStreamView({ events = [], onInspect }) {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs dark:border-slate-700 border-slate-300 dark:bg-slate-800/80 bg-slate-50 dark:text-slate-300 text-slate-700 hover:text-slate-900 dark:hover:text-white"
+                          className="h-7 text-xs dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 dark:text-[#c7d0d9] text-slate-700 hover:text-slate-900 dark:hover:text-white"
                         >
-                          <SlidersHorizontal className="h-3 w-3 mr-1 text-cyan-500 dark:text-cyan-400" />
+                          <SlidersHorizontal className="h-3 w-3 mr-1 text-[#3274d9] dark:text-[#5794f2]" />
                           <span>
                             {logViewMode === 'nowrap'
                               ? 'Wrap disabled'
@@ -236,10 +237,10 @@ export function LogStreamView({ events = [], onInspect }) {
 
                 <DropdownMenuContent
                   align="end"
-                  className="w-72 dark:bg-[#121826] bg-white dark:border-slate-800 border-slate-200 p-1.5 shadow-2xl dark:text-slate-300 text-slate-700"
+                  className="w-72 dark:bg-[#181b1f] bg-white dark:border-[#2c323f] border-slate-200 p-1.5 shadow-2xl dark:text-slate-300 text-slate-700"
                 >
                   <div className="space-y-1">
-                    <div
+                    <DropdownMenuItem
                       onClick={() => setLogViewMode('nowrap')}
                       className={`flex items-center text-xs py-2 px-3 rounded cursor-pointer transition select-none relative ${
                         logViewMode === 'nowrap'
@@ -251,9 +252,9 @@ export function LogStreamView({ events = [], onInspect }) {
                         <span className="absolute left-1.5 top-2 bottom-2 w-1 rounded-full bg-amber-500" />
                       )}
                       <span className="pl-2">Disable line wrapping</span>
-                    </div>
+                    </DropdownMenuItem>
 
-                    <div
+                    <DropdownMenuItem
                       onClick={() => setLogViewMode('wrap')}
                       className={`flex items-center text-xs py-2 px-3 rounded cursor-pointer transition select-none relative ${
                         logViewMode === 'wrap'
@@ -265,9 +266,9 @@ export function LogStreamView({ events = [], onInspect }) {
                         <span className="absolute left-1.5 top-2 bottom-2 w-1 rounded-full bg-amber-500" />
                       )}
                       <span className="pl-2">Enable line wrapping</span>
-                    </div>
+                    </DropdownMenuItem>
 
-                    <div
+                    <DropdownMenuItem
                       onClick={() => setLogViewMode('pretty')}
                       className={`flex items-center text-xs py-2 px-3 rounded cursor-pointer transition select-none relative ${
                         logViewMode === 'pretty'
@@ -279,7 +280,7 @@ export function LogStreamView({ events = [], onInspect }) {
                         <span className="absolute left-1.5 top-2 bottom-2 w-1 rounded-full bg-amber-500" />
                       )}
                       <span className="pl-2">Enable line wrapping and prettify JSON</span>
-                    </div>
+                    </DropdownMenuItem>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
