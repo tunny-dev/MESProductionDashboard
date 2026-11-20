@@ -142,10 +142,11 @@ jobs:
         id: versioning
         env:
           GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $repo     = "${{ github.repository }}"
+          $repo     = $env:REPO_NAME
           $baseUrl  = $env:GITEA_BASE_URL
           $headers  = @{
             Authorization  = "token $env:GITEA_TOKEN"
@@ -153,7 +154,7 @@ jobs:
           }
 
           # Lấy tag mới nhất từ Gitea API
-          $tagsUrl = "${baseUrl}/api/v1/repos/${repo}/tags?limit=50&page=1"
+          $tagsUrl = "$baseUrl/api/v1/repos/$repo/tags?limit=50&page=1"
           $tags = Invoke-RestMethod `
             -Method Get `
             -Uri $tagsUrl `
@@ -200,22 +201,22 @@ jobs:
             tag_name         = $newTag
             target_commitish = $sha
             name             = "Release $newTag"
-            body             = "**Commit:** $sha``n**Built:** $stamp"
+            body             = "**Commit:** $sha`n**Built:** $stamp"
             draft            = $false
             prerelease       = $false
           } | ConvertTo-Json
 
           $release = Invoke-RestMethod `
             -Method Post `
-            -Uri "${baseUrl}/api/v1/repos/${repo}/releases" `
+            -Uri "$baseUrl/api/v1/repos/$repo/releases" `
             -Headers $headers `
             -Body $releaseBody `
             -SkipCertificateCheck
 
-          Write-Host "Release created: $($release.id) — $newTag"
+          Write-Host "Release created: $($release.id)  -  $newTag"
 
           # Upload artifact zip
-          $uploadUrl = "${baseUrl}/api/v1/repos/${repo}/releases/$($release.id)/assets?name=${zipName}"
+          $uploadUrl = "$baseUrl/api/v1/repos/$repo/releases/$($release.id)/assets?name=$zipName"
 
           Invoke-RestMethod `
             -Method Post `
