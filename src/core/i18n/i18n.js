@@ -53,4 +53,17 @@ export function changeLanguage(code) {
   writePreference('language', code);
 }
 
+// Tự động đồng bộ thay đổi ngôn ngữ giữa các tab trình duyệt (Cross-tab sync)
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'sfcs-language' && event.newValue) {
+      const newLang = event.newValue;
+      if (newLang !== i18n.language && LANGUAGES.some((l) => l.code === newLang)) {
+        i18n.changeLanguage(newLang);
+        document.documentElement.lang = newLang;
+      }
+    }
+  });
+}
+
 export { i18n };

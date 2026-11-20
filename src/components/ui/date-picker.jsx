@@ -1,14 +1,3 @@
-/**
- * Ô CHỌN NGÀY (một ngày) và Ô CHỌN KHOẢNG NGÀY.
- *
- * Cùng bộ khung với shadcn: Popover (Base UI trong dự án) + Calendar
- * (react-day-picker). Icon lấy từ lucide như các component khác — không
- * `@radix-ui/react-icons` vì dự án không cài package đó.
- *
- * Ngày được trả về là object `Date` của react-day-picker (00:00 local time).
- * Ai cần giá trị để đưa lên URL thì tự format — component không ép kiểu.
- */
-
 import * as React from 'react';
 import { format } from 'date-fns';
 
@@ -21,13 +10,6 @@ import { CalendarIcon } from 'lucide-react';
 const TRIGGER_CLASS =
   'h-9 w-full justify-start gap-2 px-3 text-sm font-normal data-[placeholder]:text-muted-foreground';
 
-/**
- * Chọn MỘT ngày.
- *
- * @param value      ngày đang chọn (Date | undefined)
- * @param onChange   nhận Date | undefined
- * @param placeholder chữ khi chưa chọn
- */
 export function DatePicker({ value, onChange, placeholder = 'Chọn ngày', className, id }) {
   const [open, setOpen] = React.useState(false);
 
@@ -60,12 +42,6 @@ export function DatePicker({ value, onChange, placeholder = 'Chọn ngày', clas
   );
 }
 
-/**
- * Chọn KHOẢNG ngày (from → to).
- *
- * @param value      { from?: Date, to?: Date }
- * @param onChange   nhận { from, to }
- */
 export function DateRangePicker({ value, onChange, className, id }) {
   const [open, setOpen] = React.useState(false);
   const range = value ?? {};
@@ -96,7 +72,6 @@ export function DateRangePicker({ value, onChange, className, id }) {
           selected={range}
           onSelect={(next) => {
             onChange?.(next);
-            // Chọn xong cả hai đầu thì đóng, giống ô một ngày.
             if (next?.from && next?.to) setOpen(false);
           }}
           initialFocus

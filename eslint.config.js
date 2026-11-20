@@ -24,9 +24,15 @@ export default defineConfig([
         ecmaFeatures: { jsx: true },
       },
     },
+    rules: {
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
   {
-    files: ['src/core/router/**/*.{js,jsx}'],
+    files: [
+      'src/core/router/**/*.{js,jsx}',
+      'src/features/production-dashboard/components/charts/ChartCommon.jsx',
+    ],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

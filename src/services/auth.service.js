@@ -1,61 +1,41 @@
-import { ENDPOINTS } from '@/constants/api';
-import { http } from '@/core/api/client';
+import { ENDPOINTS } from '@/config/api';
+import { http } from '@/lib/http';
 
 /**
- * Đăng nhập MES.
- * @param {any} payload
- * @param {string} [fallbackUsername]
- * @returns {{ token: string, refreshToken: null, expiresAt: null,
- *            user: { id: string, name: string, email: null, type: null } }}
+ * @param {{ username: string, password: string, company?: string }} credentials
+ * @returns {Promise<{ token: string, refreshToken: string|null, expiresAt: string|null, user: { id: string, name: string, email: string|null, type: string|null } }>}
  */
-function toSession(payload, fallbackUsername) {
-  const candidates = [payload, payload?.data, payload?.result, payload?.data?.data];
+export async function login({ username, password, company = '' }) {
+  const data = await http.post(ENDPOINTS.auth.login, { username, password, company });
 
-  const session = candidates.find((candidate) => {
-    const value =
-      candidate?.token ?? candidate?.accessToken ?? candidate?.access_token ?? candidate?.jwt;
-    return typeof value === 'string' && value.trim().length > 0;
-  });
-
-  const token = session?.token ?? session?.accessToken ?? session?.access_token ?? session?.jwt;
-
-  if (typeof token !== 'string' || token.trim() === '') {
-    const error = new Error('MES không trả về token đăng nhập');
+  const token = data?.accessToken ?? data?.token;
+  if (!token) {
+    const error = new Error('Hệ thống không trả về token xác thực hợp lệ');
     error.status = 502;
     throw error;
   }
 
-  const remoteUser =
-    session?.user ?? session?.profile ?? session?.account ?? payload?.user ?? payload?.data?.user;
-
-  const id = remoteUser?.id ?? remoteUser?.userId ?? remoteUser?.username ?? fallbackUsername;
-  const name = remoteUser?.name ?? remoteUser?.fullName ?? remoteUser?.displayName ?? id;
+  const remoteUser = data.user ?? {};
+  const id = remoteUser.id ?? username;
+  const name = remoteUser.name ?? id;
 
   return {
     token,
-    refreshToken: null,
-    expiresAt: null,
+    refreshToken: data.refreshToken ?? null,
+    expiresAt: data.expiresAt ?? null,
     user: {
-      id: String(id ?? ''),
-      name: String(name ?? id ?? ''),
-      email: null,
-      type: null,
+      id: String(id),
+      name: String(name),
+      email: remoteUser.email ?? null,
+      type: Array.isArray(remoteUser.roles) ? remoteUser.roles[0] : null,
     },
   };
 }
 
-export async function login({ username, password, company = '' }) {
-  const payload = await http.post(ENDPOINTS.mes.auth, { username, password, company });
-  return toSession(payload, username);
-}
-
-export async function fetchMe() {
-  return null;
-}
-
-/**
- * Đăng xuất.
- */
 export async function logout() {
-  return null;
+  try {
+    return await http.post(ENDPOINTS.auth.logout);
+  } catch {
+    return null;
+  }
 }

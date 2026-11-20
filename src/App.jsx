@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next';
 import { i18n } from '@/core/i18n/i18n';
 import { queryClient } from '@/core/api/queryClient';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { OfflineBanner } from '@/components/common/OfflineBanner';
 import { Toaster } from '@/components/ui/toast';
 import { SessionExpiredDialog } from '@/components/common/SessionExpiredDialog';
 import { router } from '@/core/router/AppRouter';
@@ -21,6 +22,7 @@ export function App() {
 
   return (
     <ErrorBoundary>
+      <OfflineBanner />
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <RouterProvider router={router} />

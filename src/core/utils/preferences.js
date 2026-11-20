@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import { storage } from '@/core/utils/storage';
 
 export function readPreference(key, allowed, fallback) {
   const stored = storage.getItem(key);

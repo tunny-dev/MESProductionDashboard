@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 
-import { ErrorGhostButton, ErrorPrimaryButton, ErrorScreen } from './ErrorScreen';
+import { ErrorGhostButton, ErrorPrimaryButton, ErrorScreen } from '@/components/common/ErrorScreen';
 
 export function DataDownScreen({ onRetry }) {
   const { t } = useTranslation();
