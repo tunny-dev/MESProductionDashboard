@@ -138,99 +138,6 @@ jobs:
 
           Write-Host "Vite build validated: $dist"
 
-      - name: Bump version and create Gitea Release
-        id: versioning
-        env:
-          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          REPO_NAME: ${{ github.repository }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          # Tương thích Windows PowerShell 5.1: bỏ qua xác thực SSL
-          [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
-
-          $repo     = $env:REPO_NAME
-          $baseUrl  = $env:GITEA_BASE_URL
-          $headers  = @{
-            Authorization  = "token $env:GITEA_TOKEN"
-            'Content-Type' = 'application/json'
-          }
-
-          # Lấy tag mới nhất từ Gitea API
-          $tagsUrl = "$baseUrl/api/v1/repos/$repo/tags?limit=50&page=1"
-          $tags = Invoke-RestMethod `
-            -Method Get `
-            -Uri $tagsUrl `
-            -Headers $headers
-
-          # Lọc tag dạng vX.Y.Z, lấy cái lớn nhất
-          $semverTags = $tags |
-            Where-Object { $_.name -match '^v(\d+)\.(\d+)\.(\d+)$' } |
-            Sort-Object {
-              $m = $_.name -match '^v(\d+)\.(\d+)\.(\d+)$'
-              [int]$Matches[1] * 1000000 + [int]$Matches[2] * 1000 + [int]$Matches[3]
-            } -Descending
-
-          if ($semverTags.Count -eq 0) {
-            # Chưa có tag nào → bắt đầu từ v1.0.0
-            $newTag = 'v1.0.0'
-            Write-Host "No existing semver tag found. Starting at $newTag"
-          } else {
-            $latest = $semverTags[0].name
-            Write-Host "Latest tag: $latest"
-
-            $null = $latest -match '^v(\d+)\.(\d+)\.(\d+)$'
-            $major = [int]$Matches[1]
-            $minor = [int]$Matches[2]
-            $patch = [int]$Matches[3]
-
-            # Tự động bump patch
-            $newTag = "v${major}.${minor}.$($patch + 1)"
-            Write-Host "New tag: $newTag"
-          }
-
-          $sha   = (git rev-parse HEAD).Trim()
-          $short = (git rev-parse --short HEAD).Trim()
-          $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-
-          # Zip dist để đính kèm release
-          $zipName = "MESProductionDashboardClient-${newTag}.zip"
-          Compress-Archive -Path dist\* -DestinationPath $zipName -Force
-          Write-Host "Packaged: $zipName"
-
-          # Tạo Gitea Release
-          $releaseBody = @{
-            tag_name         = $newTag
-            target_commitish = $sha
-            name             = "Release $newTag"
-            body             = "**Commit:** $sha`n**Built:** $stamp"
-            draft            = $false
-            prerelease       = $false
-          } | ConvertTo-Json
-
-          $release = Invoke-RestMethod `
-            -Method Post `
-            -Uri "$baseUrl/api/v1/repos/$repo/releases" `
-            -Headers $headers `
-            -Body $releaseBody
-
-          Write-Host "Release created: $($release.id)  -  $newTag"
-
-          # Upload artifact zip
-          $uploadUrl = "$baseUrl/api/v1/repos/$repo/releases/$($release.id)/assets?name=$zipName"
-
-          Invoke-RestMethod `
-            -Method Post `
-            -Uri $uploadUrl `
-            -Headers @{ Authorization = "token $env:GITEA_TOKEN" } `
-            -InFile $zipName `
-            -ContentType 'application/zip'
-
-          Write-Host "Artifact uploaded: $zipName"
-
-          # Expose tag ra cho các step sau
-          "RELEASE_TAG=$newTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-
       - name: Prepare publish artifact
         run: |
           $ErrorActionPreference = 'Stop'
@@ -251,7 +158,12 @@ jobs:
           $sha         = (git rev-parse HEAD).Trim()
           $short       = (git rev-parse --short HEAD).Trim()
           $stamp       = Get-Date -Format "yyyyMMdd_HHmmss"
-          $tag         = "${{ steps.versioning.outputs.RELEASE_TAG }}"
+          $pkgVersion  = "1.0.0"
+          if (Test-Path "package.json") {
+            $pkg = Get-Content "package.json" -Raw | ConvertFrom-Json
+            if ($pkg.version) { $pkgVersion = $pkg.version }
+          }
+          $tag         = "v${pkgVersion}_${short}"
           $releaseName = "${stamp}_${short}"
 
           @(
