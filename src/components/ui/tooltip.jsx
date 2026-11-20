@@ -9,8 +9,19 @@ function Tooltip({ ...props }) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
-function TooltipTrigger({ ...props }) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
+function TooltipTrigger({ asChild, render, children, className, ...props }) {
+  const resolvedRender = asChild && !render && children ? children : render;
+  const resolvedChildren = asChild && !render ? undefined : children;
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      render={resolvedRender}
+      className={cn('cursor-pointer', className)}
+      {...props}
+    >
+      {resolvedChildren}
+    </TooltipPrimitive.Trigger>
+  );
 }
 
 function TooltipContent({

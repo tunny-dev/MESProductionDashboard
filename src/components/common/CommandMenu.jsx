@@ -32,7 +32,7 @@ export function CommandMenu() {
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Type a command or search..." />
       <CommandList>
-        <ScrollArea className="h-[400px] pe-2">
+        <ScrollArea className="h-100 pe-2">
           <CommandEmpty>No results found.</CommandEmpty>
           {sidebarData.navGroups.map((group) => (
             <CommandGroup key={group.title} heading={group.title}>

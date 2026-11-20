@@ -13,7 +13,7 @@ import {
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useLogout } from '@/core/auth/useAuth';
 import { useAuthStore } from '@/store/authStore';
-import { GroupLabel, ICON_TRIGGER, MENU_ITEM } from '@/components/common/Preferences';
+import { GroupLabel, ICON_TRIGGER, MENU_ITEM } from '@/components/common/preferences';
 
 export function AccountMenu({ className }) {
   const { t } = useTranslation();

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: mes-production-dashboard
+  group: mes-production-dashboard-client
   cancel-in-progress: false
 
 jobs:
@@ -20,13 +20,13 @@ jobs:
 
     env:
       SITE_NAME: 'MESProductionDashboardClient'
-      CLIENT_ROOT: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient'
-      SHARED_DIR: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\shared'
-      RELEASES_DIR: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\releases'
+      DEPLOY_ROOT: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient'
+      RELEASE_DIR: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\release'
       BACKUP_ROOT: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\backup'
-      CI_ROOT: 'D:\Senao\CI\MESProductionDashboard'
-      PUBLISH_DIR: 'D:\Senao\CI\MESProductionDashboard\publish'
+      CI_ROOT: 'D:\Senao\CI\MESProductionDashboardClient'
+      PUBLISH_DIR: 'D:\Senao\CI\MESProductionDashboardClient\publish'
       KEEP_BACKUPS: '10'
+      GITEA_BASE_URL: 'https://10.1.200.200:83'
 
     steps:
       - name: Checkout
@@ -138,63 +138,146 @@ jobs:
 
           Write-Host "Vite build validated: $dist"
 
+      - name: Bump version and create Gitea Release
+        id: versioning
+        env:
+          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $repo     = "${{ github.repository }}"
+          $baseUrl  = $env:GITEA_BASE_URL
+          $headers  = @{
+            Authorization  = "token $env:GITEA_TOKEN"
+            'Content-Type' = 'application/json'
+          }
+
+          # Lấy tag mới nhất từ Gitea API
+          $tagsUrl = "${baseUrl}/api/v1/repos/${repo}/tags?limit=50&page=1"
+          $tags = Invoke-RestMethod `
+            -Method Get `
+            -Uri $tagsUrl `
+            -Headers $headers `
+            -SkipCertificateCheck
+
+          # Lọc tag dạng vX.Y.Z, lấy cái lớn nhất
+          $semverTags = $tags |
+            Where-Object { $_.name -match '^v(\d+)\.(\d+)\.(\d+)$' } |
+            Sort-Object {
+              $m = $_.name -match '^v(\d+)\.(\d+)\.(\d+)$'
+              [int]$Matches[1] * 1000000 + [int]$Matches[2] * 1000 + [int]$Matches[3]
+            } -Descending
+
+          if ($semverTags.Count -eq 0) {
+            # Chưa có tag nào → bắt đầu từ v1.0.0
+            $newTag = 'v1.0.0'
+            Write-Host "No existing semver tag found. Starting at $newTag"
+          } else {
+            $latest = $semverTags[0].name
+            Write-Host "Latest tag: $latest"
+
+            $null = $latest -match '^v(\d+)\.(\d+)\.(\d+)$'
+            $major = [int]$Matches[1]
+            $minor = [int]$Matches[2]
+            $patch = [int]$Matches[3]
+
+            # Tự động bump patch
+            $newTag = "v${major}.${minor}.$($patch + 1)"
+            Write-Host "New tag: $newTag"
+          }
+
+          $sha   = (git rev-parse HEAD).Trim()
+          $short = (git rev-parse --short HEAD).Trim()
+          $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+
+          # Zip dist để đính kèm release
+          $zipName = "MESProductionDashboardClient-${newTag}.zip"
+          Compress-Archive -Path dist\* -DestinationPath $zipName -Force
+          Write-Host "Packaged: $zipName"
+
+          # Tạo Gitea Release
+          $releaseBody = @{
+            tag_name         = $newTag
+            target_commitish = $sha
+            name             = "Release $newTag"
+            body             = "**Commit:** $sha``n**Built:** $stamp"
+            draft            = $false
+            prerelease       = $false
+          } | ConvertTo-Json
+
+          $release = Invoke-RestMethod `
+            -Method Post `
+            -Uri "${baseUrl}/api/v1/repos/${repo}/releases" `
+            -Headers $headers `
+            -Body $releaseBody `
+            -SkipCertificateCheck
+
+          Write-Host "Release created: $($release.id) — $newTag"
+
+          # Upload artifact zip
+          $uploadUrl = "${baseUrl}/api/v1/repos/${repo}/releases/$($release.id)/assets?name=${zipName}"
+
+          Invoke-RestMethod `
+            -Method Post `
+            -Uri $uploadUrl `
+            -Headers @{ Authorization = "token $env:GITEA_TOKEN" } `
+            -InFile $zipName `
+            -ContentType 'application/zip' `
+            -SkipCertificateCheck
+
+          Write-Host "Artifact uploaded: $zipName"
+
+          # Expose tag ra cho các step sau
+          "RELEASE_TAG=$newTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
       - name: Prepare publish artifact
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $dist      = Join-Path $PWD "dist"
-          $publish   = $env:PUBLISH_DIR
-          $sharedEnv = Join-Path $env:SHARED_DIR ".env"
-
-          # Bắt buộc .env phải tồn tại trong shared trước khi tiến hành.
-          if (!(Test-Path $sharedEnv)) {
-            throw "Shared .env not found at: $sharedEnv`nHãy tạo file .env trong: $($env:SHARED_DIR)"
-          }
+          $dist    = Join-Path $PWD "dist"
+          $publish = $env:PUBLISH_DIR
 
           New-Item -ItemType Directory -Force $env:CI_ROOT | Out-Null
 
-          # Xóa riêng thư mục publish, không xóa cache runner.
           if (Test-Path $publish) {
             Remove-Item $publish -Recurse -Force
           }
+
           New-Item -ItemType Directory -Force $publish | Out-Null
 
-          # Copy toàn bộ dist vào publish.
           Copy-Item (Join-Path $dist "*") -Destination $publish -Recurse -Force
-
-          # Copy .env từ shared vào artifact.
-          Copy-Item -LiteralPath $sharedEnv -Destination (Join-Path $publish ".env") -Force
-          Write-Host "Copied .env from shared: $sharedEnv"
 
           $sha         = (git rev-parse HEAD).Trim()
           $short       = (git rev-parse --short HEAD).Trim()
           $stamp       = Get-Date -Format "yyyyMMdd_HHmmss"
+          $tag         = "${{ steps.versioning.outputs.RELEASE_TAG }}"
           $releaseName = "${stamp}_${short}"
 
           @(
             "commit=$sha"
             "built=$stamp"
+            "version=$tag"
             "release=$releaseName"
           ) | Set-Content -Path (Join-Path $publish "version.txt") -Encoding UTF8
 
           Set-Content `
             -Path (Join-Path $env:CI_ROOT "ci_release_name.txt") `
-            -Value $releaseName -Encoding UTF8 -NoNewline
+            -Value $releaseName `
+            -Encoding UTF8 -NoNewline
 
           if (!(Test-Path (Join-Path $publish "index.html"))) {
             throw "Publish artifact missing index.html."
           }
+
           if (!(Test-Path (Join-Path $publish "assets") -PathType Container)) {
             throw "Publish artifact missing assets directory."
           }
-          if (!(Test-Path (Join-Path $publish ".env"))) {
-            throw "Publish artifact missing .env."
-          }
+
           if (!(Test-Path (Join-Path $publish "version.txt"))) {
             throw "Publish artifact missing version.txt."
           }
 
-          Write-Host "Publish artifact validated: $publish"
+          Write-Host "Publish artifact validated. Version: $tag"
 
       - name: Deploy to IIS with automatic rollback
         run: |
@@ -202,13 +285,12 @@ jobs:
 
           Import-Module WebAdministration -ErrorAction Stop
 
-          $siteName   = $env:SITE_NAME
-          $publish    = $env:PUBLISH_DIR
-          $releaseDir = $env:RELEASES_DIR   # IIS trỏ cố định vào đây
-          $backupRoot = $env:BACKUP_ROOT
-          $ciRoot     = $env:CI_ROOT
+          $siteName    = $env:SITE_NAME
+          $publish     = $env:PUBLISH_DIR
+          $releaseDir  = $env:RELEASE_DIR
+          $backupRoot  = $env:BACKUP_ROOT
+          $ciRoot      = $env:CI_ROOT
 
-          # --- Kiểm tra IIS site tồn tại ---
           $site = Get-Website -Name $siteName -ErrorAction Stop
           if (!$site) {
             throw "IIS site '$siteName' does not exist."
@@ -218,13 +300,15 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($appPool)) {
             throw "Cannot determine application pool for $siteName."
           }
+
           $null = Get-Item "IIS:\AppPools\$appPool" -ErrorAction Stop
+
+          $currentPath = [Environment]::ExpandEnvironmentVariables([string]$site.physicalPath)
 
           if (!(Test-Path (Join-Path $publish "index.html"))) {
             throw "Publish artifact is missing index.html."
           }
 
-          # Đảm bảo thư mục releases và backup tồn tại.
           New-Item -ItemType Directory -Force $releaseDir | Out-Null
           New-Item -ItemType Directory -Force $backupRoot | Out-Null
 
@@ -232,15 +316,13 @@ jobs:
             Get-Content -LiteralPath (Join-Path $ciRoot "ci_release_name.txt") -Raw
           ).Trim()
 
-          if ($releaseName -notmatch '^\d{8}_\d{6}_[0-9a-fA-F]+$') {
-            throw "Invalid release name: $releaseName"
-          }
+          $backupStamp = Get-Date -Format "yyyyMMdd_HHmmss"
+          $backupPath  = Join-Path $backupRoot "${backupStamp}_${releaseName}"
 
-          $backupPath          = Join-Path $backupRoot $releaseName
-          $iisTouched          = $false
+          $hasPreviousFiles = $false
+          $iisTouched       = $false
           $deploymentSucceeded = $false
 
-          # --- Helper: lấy URL để smoke test ---
           function Get-SmokeTarget {
             param([string]$Name)
 
@@ -249,11 +331,17 @@ jobs:
               throw "No IIS bindings found for $Name."
             }
 
-            $binding = $bindings |
-              Sort-Object @{ Expression = { if ($_.protocol -eq 'http') { 0 } else { 1 } } } |
+            $preferred = $bindings |
+              Where-Object { $_.bindingInformation -match '^[^:]*:[0-9]+:$' } |
+              Sort-Object { if ($_.protocol -eq 'http') { 0 } else { 1 } } |
               Select-Object -First 1
+            if (-not $preferred) {
+              $preferred = $bindings |
+                Sort-Object { if ($_.protocol -eq 'http') { 0 } else { 1 } } |
+                Select-Object -First 1
+            }
 
-            $parts      = $binding.bindingInformation.Split(':')
+            $parts      = $preferred.bindingInformation.Split(':')
             $ip         = $parts[0]
             $port       = $parts[1]
             $hostHeader = $parts[2]
@@ -264,17 +352,17 @@ jobs:
                 $connectHost -eq '0.0.0.0') {
               $connectHost = 'localhost'
             }
+
             if (![string]::IsNullOrWhiteSpace($hostHeader)) {
               $connectHost = $hostHeader
             }
 
             return @{
-              Url     = "$($binding.protocol)://${connectHost}:$port/"
-              IsHttps = ($binding.protocol -eq 'https')
+              Url     = "$($preferred.protocol)://${connectHost}:$port/"
+              IsHttps = ($preferred.protocol -eq 'https')
             }
           }
 
-          # --- Helper: HTTP smoke test (retry 12 lần x 5s) ---
           function Test-SiteHttp {
             param([string]$Url, [bool]$IsHttps)
 
@@ -295,149 +383,179 @@ jobs:
               catch {
                 Write-Host "Smoke test attempt ${i} failed: $($_.Exception.Message)"
               }
+
               Start-Sleep -Seconds 5
             }
+
             return $false
           }
 
-          # --- Helper: khôi phục từ backup vào releases rồi start lại IIS ---
-          function Restore-FromBackup {
-            param([string]$BackupPath, [string]$TargetDir, [string]$Pool)
+          function Restore-Backup {
+            param(
+              [string]$SourceBackup,
+              [string]$TargetDir,
+              [string]$Pool,
+              [string]$Site
+            )
 
-            Write-Host "Restoring from backup: $BackupPath"
+            Write-Host "Restoring backup from $SourceBackup to $TargetDir..."
 
-            Stop-Website  -Name $siteName -ErrorAction SilentlyContinue
-            Stop-WebAppPool -Name $Pool  -ErrorAction SilentlyContinue
+            Stop-Website    -Name $Site -ErrorAction SilentlyContinue
+            Stop-WebAppPool -Name $Pool -ErrorAction SilentlyContinue
 
-            # Xóa nội dung hiện tại trong releases rồi restore từ backup.
-            Get-ChildItem -LiteralPath $TargetDir -Force |
-              Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            for ($w = 1; $w -le 15; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $Pool).Value -eq 'Stopped') { break }
+            }
 
-            Get-ChildItem -LiteralPath $BackupPath -Force |
-              Where-Object { $_.Name -ne 'rollback.json' } |
-              ForEach-Object {
-                Copy-Item -LiteralPath $_.FullName -Destination $TargetDir -Recurse -Force
-              }
+            if (Test-Path $SourceBackup) {
+              Get-ChildItem -LiteralPath $TargetDir -Force | Remove-Item -Recurse -Force
+              Copy-Item (Join-Path $SourceBackup "*") -Destination $TargetDir -Recurse -Force
+            }
+
+            Set-ItemProperty "IIS:\Sites\$Site" -Name physicalPath -Value $TargetDir
 
             Start-WebAppPool -Name $Pool
-            Start-Sleep -Seconds 3
-            Start-Website -Name $siteName
-
-            $state     = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $Pool).Value
-
-            if ($state -ne 'Started' -or $poolState -ne 'Started') {
-              throw "Previous release restored, but IIS failed to start."
+            $poolStarted = $false
+            for ($w = 1; $w -le 10; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $Pool).Value -eq 'Started') {
+                $poolStarted = $true; break
+              }
+            }
+            if (-not $poolStarted) {
+              throw "Backup restored, but application pool failed to start."
             }
 
-            $target = Get-SmokeTarget -Name $siteName
+            Start-Website -Name $Site
+            if ((Get-Website -Name $Site).State -ne 'Started') {
+              throw "Backup restored, but IIS website failed to start."
+            }
+
+            $target = Get-SmokeTarget -Name $Site
             if (!(Test-SiteHttp -Url $target.Url -IsHttps $target.IsHttps)) {
-              throw "Previous release did not pass the HTTP smoke test."
+              throw "Restored backup did not pass the HTTP smoke test."
             }
 
-            Write-Host "Rollback completed and previous release responds with HTTP 200."
+            Write-Host "Rollback completed successfully. Site responds with HTTP 200."
           }
 
           try {
-            # 1. Backup nội dung releases hiện tại trước khi ghi đè.
-            New-Item -ItemType Directory -Force $backupPath | Out-Null
+            # 1. Back up current release files if present
+            $existingItems = @(Get-ChildItem -LiteralPath $releaseDir -Force)
+            if ($existingItems.Count -gt 0) {
+              $hasPreviousFiles = $true
+              New-Item -ItemType Directory -Force $backupPath | Out-Null
+              foreach ($item in $existingItems) {
+                Copy-Item -LiteralPath $item.FullName -Destination $backupPath -Recurse -Force
+              }
 
-            if (Test-Path $releaseDir) {
-              Get-ChildItem -LiteralPath $releaseDir -Force |
-                Where-Object { $_.Name -ne 'app_offline.htm' } |
-                ForEach-Object {
-                  Copy-Item -LiteralPath $_.FullName -Destination $backupPath -Recurse -Force
-                }
+              $rollbackInfo = [ordered]@{
+                site                 = $siteName
+                applicationPool      = $appPool
+                previousPhysicalPath = $currentPath
+                targetPhysicalPath   = $releaseDir
+                backupPath           = $backupPath
+                commit               = (git rev-parse HEAD).Trim()
+                created              = (Get-Date).ToString('o')
+              }
+              $rollbackInfo |
+                ConvertTo-Json -Depth 5 |
+                Set-Content (Join-Path $backupPath "rollback.json") -Encoding UTF8
+
+              Write-Host "Current release backed up to: $backupPath"
+            } else {
+              Write-Host "No existing files in $releaseDir to back up."
             }
 
-            [ordered]@{
-              site            = $siteName
-              applicationPool = $appPool
-              releasesDir     = $releaseDir
-              releaseName     = $releaseName
-              commit          = (git rev-parse HEAD).Trim()
-              created         = (Get-Date).ToString('o')
-            } | ConvertTo-Json -Depth 5 |
-              Set-Content (Join-Path $backupPath "rollback.json") -Encoding UTF8
-
-            Write-Host "Backup created: $backupPath"
-
-            # 2. Stop IIS, copy build mới vào releases.
+            # 2. Stop site & pool before updating files in release directory
             $iisTouched = $true
 
-            Stop-Website  -Name $siteName
-            Stop-WebAppPool -Name $appPool
+            Stop-Website    -Name $siteName -ErrorAction SilentlyContinue
+            Stop-WebAppPool -Name $appPool -ErrorAction SilentlyContinue
 
-            if ((Get-WebAppPoolState -Name $appPool).Value -ne 'Stopped') {
-              throw "Application pool did not stop."
+            for ($w = 1; $w -le 15; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $appPool).Value -eq 'Stopped') { break }
             }
 
-            # Xóa nội dung cũ trong releases rồi copy build mới vào.
+            # 3. Clean and deploy new files to release directory
             Get-ChildItem -LiteralPath $releaseDir -Force | Remove-Item -Recurse -Force
-
             Copy-Item (Join-Path $publish "*") -Destination $releaseDir -Recurse -Force
 
-            # Cấp quyền cho IIS App Pool.
+            # 4. Grant IIS AppPool permissions
             $aclUser = "IIS AppPool\$appPool"
             & icacls.exe $releaseDir /grant "${aclUser}:(OI)(CI)RX" /T /C
             if ($LASTEXITCODE -ne 0) {
-              throw "Failed to grant IIS read permissions on releases."
+              throw "Failed to grant IIS read permissions on release directory."
             }
 
             if (!(Test-Path (Join-Path $releaseDir "index.html"))) {
-              throw "Deployed releases is missing index.html."
-            }
-            if (!(Test-Path (Join-Path $releaseDir ".env"))) {
-              throw "Deployed releases is missing .env."
+              throw "Release directory is missing index.html after copy."
             }
 
-            # 3. Start IIS.
+            if (!(Test-Path (Join-Path $releaseDir "version.txt"))) {
+              throw "Release directory is missing version.txt after copy."
+            }
+
+            # 5. Ensure IIS physical path points to release directory
+            $configuredPath = [Environment]::ExpandEnvironmentVariables([string](Get-Website -Name $siteName).physicalPath)
+            if ($configuredPath.TrimEnd('\') -ne $releaseDir.TrimEnd('\')) {
+              Write-Host "Updating IIS physicalPath from '$configuredPath' to '$releaseDir'..."
+              Set-ItemProperty "IIS:\Sites\$siteName" -Name physicalPath -Value $releaseDir
+            }
+
+            # 6. Start Application Pool & Website
             Start-WebAppPool -Name $appPool
-            Start-Sleep -Seconds 3
-
-            if ((Get-WebAppPoolState -Name $appPool).Value -ne 'Started') {
-              throw "New release application pool failed to start."
+            $poolStarted = $false
+            for ($w = 1; $w -le 10; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $appPool).Value -eq 'Started') {
+                $poolStarted = $true; break
+              }
+            }
+            if (-not $poolStarted) {
+              throw "Application pool failed to start."
             }
 
             Start-Website -Name $siteName
-
             if ((Get-Website -Name $siteName).State -ne 'Started') {
               throw "IIS site failed to start."
             }
 
-            # 4. Smoke test.
+            # 7. Smoke test HTTP 200
             $target = Get-SmokeTarget -Name $siteName
-            Write-Host "Testing $($target.Url)"
+            Write-Host "Smoke testing $($target.Url)..."
 
             if (!(Test-SiteHttp -Url $target.Url -IsHttps $target.IsHttps)) {
-              throw "New release did not return HTTP 200."
+              throw "New release did not return HTTP 200 during smoke test."
             }
 
             $deploymentSucceeded = $true
-            Write-Host "Deployment successful: $releaseName"
+            Write-Host "Deployment successful to: $releaseDir"
           }
           catch {
             $deployError = $_.Exception.Message
-            Write-Host "Deployment failed: $deployError"
+            Write-Host "Deployment error: $deployError"
 
-            if ($iisTouched) {
+            if ($iisTouched -and $hasPreviousFiles) {
               try {
-                Restore-FromBackup -BackupPath $backupPath -TargetDir $releaseDir -Pool $appPool
+                Restore-Backup -SourceBackup $backupPath -TargetDir $releaseDir -Pool $appPool -Site $siteName
               }
               catch {
                 throw "DEPLOYMENT FAILED: $deployError. ROLLBACK ALSO FAILED: $($_.Exception.Message). Manual IIS recovery is required."
               }
             }
 
-            throw "Deployment failed. $(if ($iisTouched) { 'Rollback completed.' } else { 'The live IIS site was not changed.' }) Reason: $deployError"
+            throw "Deployment failed. $(if ($iisTouched -and $hasPreviousFiles) { 'Rollback completed.' } else { 'Live site untouched or no previous files existed.' }) Reason: $deployError"
           }
           finally {
             if (!$deploymentSucceeded) {
-              Write-Host "Deployment unsuccessful; preserving files for investigation."
+              Write-Host "Deployment did not succeed; check logs and artifacts."
             }
           }
 
-          # 5. Prune old backups only after successful deployment.
+          # 8. Prune old backups (keep latest N)
           $keepBackups = [int]$env:KEEP_BACKUPS
 
           $backups = @(
@@ -449,4 +567,4 @@ jobs:
             Write-Host "Removed old backup: $($old.Name)"
           }
 
-          Write-Host "Deployment completed successfully."
+          Write-Host "Deployment process completed successfully."

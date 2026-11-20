@@ -31,6 +31,8 @@ const CONSOLE_METHOD = {
 
 class Logger {
   #level;
+  #buffer = [];
+  #maxBuffer = 100;
 
   constructor(level = resolveDefaultLevel()) {
     this.#level = level;
@@ -46,6 +48,16 @@ class Logger {
 
   getLevel() {
     return this.#level;
+  }
+
+  /** Lấy danh sách 100 log gần nhất */
+  getRecentLogs() {
+    return [...this.#buffer];
+  }
+
+  /** Xuất log dưới dạng JSON*/
+  exportLogsJson() {
+    return JSON.stringify(this.#buffer, null, 2);
   }
 
   /** @param {string} event @param {object} [data] */
@@ -68,23 +80,18 @@ class Logger {
     this.#write('error', event, data);
   }
 
-  /**
-   * Tạo child logger với namespace cố định, tránh lặp prefix ở mọi dòng.
-   *
-   * @param {string} namespace  ví dụ 'mes', 'auth'
-   * @returns {ChildLogger}
-   *
-   * @example
-   *   const log = logger.child('mes')
-   *   log.info('request', { url })   // event → 'mes:request'
-   */
   child(namespace) {
     return new ChildLogger(this, namespace);
   }
 
   #write(level, event, data) {
-    if (LEVEL_RANK[level] < LEVEL_RANK[this.#level]) return;
     const entry = buildEntry(level, event, data);
+    this.#buffer.push(entry);
+    if (this.#buffer.length > this.#maxBuffer) {
+      this.#buffer.shift();
+    }
+
+    if (LEVEL_RANK[level] < LEVEL_RANK[this.#level]) return;
 
     console[CONSOLE_METHOD[level]](`[${entry.ts}] ${level.toUpperCase()} ${event}`, entry);
   }

@@ -51,12 +51,7 @@ function SelectContent({
   sideOffset = 4,
   align = 'center',
   alignOffset = 0,
-  // `alignItemWithTrigger` mặc định của Base UI là true: nó đẩy popup lên để
-  // mục ĐANG CHỌN nằm ngang với ô trigger. Ở đây điều đó sai — danh sách ngắn,
-  // chỗ bên dưới rộng thì popup vẫn bị nhô lên ~2 dòng, treo lơ lửng không
-  // liền ô (đo thật: mọi select trong header bị lệch -74px dù `side=bottom`).
-  // Nó chỉ hữu ích với danh sách dài có thanh cuộn dài; bật lại bằng prop khi
-  // thật sự cần.
+  // Đặt false để popup dropdown gắn liền ngay dưới trigger mà không bị lệch vị trí
   alignItemWithTrigger = false,
   ...props
 }) {

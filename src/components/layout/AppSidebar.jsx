@@ -18,6 +18,27 @@ export function AppSidebar() {
   const sidebarName = authUser?.name || authUser?.username || 'User';
   const sidebarEmail = authUser?.email || authUser?.username || '';
   const sidebarInitial = sidebarName.trim().charAt(0).toUpperCase() || 'U';
+
+  const currentEmpNo = (
+    authUser?.id ||
+    authUser?.username ||
+    authUser?.name ||
+    authUser?.empNo ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+  const isK00136 = currentEmpNo === 'K00136';
+
+  const filteredNavGroups = sidebarData.navGroups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.url === '/production-board') {
+        return isK00136;
+      }
+      return true;
+    }),
+  }));
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
@@ -38,7 +59,7 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent className="gap-1">
-        {sidebarData.navGroups.map((props) => (
+        {filteredNavGroups.map((props) => (
           <NavGroup key={props.title} {...props} />
         ))}
       </SidebarContent>

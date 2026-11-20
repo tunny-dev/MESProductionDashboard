@@ -2,50 +2,50 @@ import { lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Forbidden } from '@/components/common/Forbidden';
-import { NotFound } from '@/components/common/NotFound';
-import { RequireAuth, RequireGuest, RequireOverviewAccess } from './ProtectedRoute';
-import { RouteErrorPage, FullscreenRouteErrorPage } from './RouteErrorPage';
+import {
+  ForbiddenPage,
+  NotFoundPage,
+  RouteErrorPage,
+  FullscreenRouteErrorPage,
+} from '@/features/errors';
+import { RequireAuth, RequireGuest, RequireOverviewAccess } from '@/core/router/ProtectedRoute';
 import { ROUTES } from '@/constants/routes';
 
 const OverviewPage = lazy(() =>
-  import('@/pages/overview/OverviewPage').then((m) => ({ default: m.default || m.OverviewPage }))
+  import('@/features/overview').then((m) => ({ default: m.default || m.OverviewPage }))
 );
 const HomePage = lazy(() =>
-  import('@/pages/home/HomePage').then((m) => ({ default: m.default || m.HomePage }))
+  import('@/features/home').then((m) => ({ default: m.default || m.HomePage }))
 );
 const LineDetailPage = lazy(() =>
-  import('@/pages/overview/LineDetailPage').then((m) => ({
-    default: m.default || m.LineDetailPage,
+  import('@/features/overview').then((m) => ({
+    default: m.LineDetailPage || m.default,
   }))
 );
-const ChartPage = lazy(() =>
-  import('@/pages/overview/ChartPage').then((m) => ({ default: m.default || m.ChartPage }))
-);
 const LoginPage = lazy(() =>
-  import('@/pages/auth/LoginPage').then((m) => ({ default: m.default || m.LoginPage }))
+  import('@/features/auth').then((m) => ({ default: m.default || m.LoginPage }))
 );
 const ForgotPasswordPage = lazy(() =>
-  import('@/pages/auth/ForgotPasswordPage').then((m) => ({
-    default: m.default || m.ForgotPasswordPage,
+  import('@/features/auth').then((m) => ({
+    default: m.ForgotPasswordPage || m.default,
   }))
 );
 
 const ProductionDashboardPage = lazy(() =>
-  import('@/pages/production-dashboard/ProductionDashboardPage').then((m) => ({
+  import('@/features/production-dashboard').then((m) => ({
     default: m.default || m.ProductionDashboardPage,
   }))
 );
 
-const WipReportPage = lazy(() =>
-  import('@/pages/wip-report/WipReportPage').then((m) => ({
-    default: m.default || m.WipReportPage,
+const ProductionBoardPage = lazy(() =>
+  import('@/features/production-board/ProductionBoardPage').then((m) => ({
+    default: m.default || m.ProductionBoardPage,
   }))
 );
 
-const CimCycleTimePage = lazy(() =>
-  import('@/pages/maintain/CimCycleTimePage').then((m) => ({
-    default: m.default || m.CimCycleTimePage,
+const SystemLogsPage = lazy(() =>
+  import('@/features/system-logs').then((m) => ({
+    default: m.default || m.SystemLogsPage,
   }))
 );
 
@@ -103,14 +103,6 @@ export const router = createBrowserRouter([
           </RequireOverviewAccess>
         ),
       },
-      {
-        path: 'chart',
-        element: (
-          <RequireOverviewAccess>
-            <ChartPage />
-          </RequireOverviewAccess>
-        ),
-      },
     ],
   },
   {
@@ -123,41 +115,30 @@ export const router = createBrowserRouter([
     errorElement: <FullscreenRouteErrorPage />,
   },
   {
-    path: ROUTES.WIP_REPORT,
+    path: ROUTES.PRODUCTION_BOARD,
     element: (
       <RequireAuth>
-        <AppLayout />
+        <ProductionBoardPage />
       </RequireAuth>
     ),
-    errorElement: <RouteErrorPage />,
-    children: [
-      {
-        index: true,
-        element: <WipReportPage />,
-      },
-    ],
+    errorElement: <FullscreenRouteErrorPage />,
   },
   {
-    path: ROUTES.MAINTAIN_CIM_CYCLE_TIME,
-    element: (
-      <RequireAuth>
-        <AppLayout />
-      </RequireAuth>
-    ),
-    errorElement: <RouteErrorPage />,
-    children: [
-      {
-        index: true,
-        element: <CimCycleTimePage />,
-      },
-    ],
+    path: ROUTES.SYSTEM_LOGS,
+    element: <SystemLogsPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: '/system/logs',
+    element: <SystemLogsPage />,
+    errorElement: <FullscreenRouteErrorPage />,
   },
   {
     path: ROUTES.FORBIDDEN,
-    element: <Forbidden />,
+    element: <ForbiddenPage />,
     errorElement: <RouteErrorPage />,
   },
-  { path: '*', element: <NotFound /> },
+  { path: '*', element: <NotFoundPage /> },
 ]);
 
 export function AppRouter() {
