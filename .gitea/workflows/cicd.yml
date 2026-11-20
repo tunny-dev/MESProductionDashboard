@@ -111,10 +111,14 @@ jobs:
           Write-Host "npm ci completed successfully."
 
       - name: Build Vite application
+        env:
+          VITE_API_BASE_URL: 'http://10.1.200.200:84/api'
+          VITE_DEFAULT_FACTORY: 'VN'
+          VITE_LOG_LEVEL: 'error'
         run: |
           $ErrorActionPreference = 'Stop'
 
-          Write-Host "Starting Vite build..."
+          Write-Host "Starting Vite build with API: $env:VITE_API_BASE_URL"
           npm run build
 
           if ($LASTEXITCODE -ne 0) {

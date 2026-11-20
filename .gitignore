@@ -27,10 +27,10 @@ stats.html
 .env.local
 .env.*.local
 *.local
-.env.production
 
-# Keep example / environment templates
+# Keep production & example environment templates
 !.env.example
+!.env.production
 
 # =========================
 # Logs
