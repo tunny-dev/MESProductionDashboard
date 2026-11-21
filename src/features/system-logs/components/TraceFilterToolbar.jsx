@@ -1,11 +1,23 @@
 ﻿import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Search, RefreshCw, FolderOpen, Activity, Sun, Moon } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import {
+  Search,
+  RefreshCw,
+  FolderOpen,
+  Activity,
+  Sun,
+  Moon,
+  Layers,
+  Database,
+  AlertCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { TimeRangePicker } from '@/features/system-logs/components/TimeRangePicker';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/core/utils/utils';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -53,7 +65,13 @@ export function TraceFilterToolbar({
   onAutoRefreshChange,
   resolvedTheme = 'dark',
   toggleTheme,
+  isSubPage = false,
 }) {
+  const location = useLocation();
+  const isSystemLogsActive =
+    location.pathname === '/system-logs' ||
+    location.pathname === '/system/logs' ||
+    /^\/system(-logs)?\/(traces|routes|stream|raw|client)/.test(location.pathname);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [queryDraft, setQueryDraft] = useState(search || traceIdFilter || '');
 
@@ -64,20 +82,24 @@ export function TraceFilterToolbar({
 
   const handleExecuteQuery = () => {
     const trimmed = queryDraft.trim();
-    onSearchChange(trimmed);
+    if (typeof onSearchChange === 'function') {
+      onSearchChange(trimmed);
+    }
     if (/^[a-fA-F0-9]{32}$/.test(trimmed)) {
-      if (onTraceIdFilterChange) onTraceIdFilterChange(trimmed);
-    } else if (onTraceIdFilterChange) {
+      if (typeof onTraceIdFilterChange === 'function') onTraceIdFilterChange(trimmed);
+    } else if (typeof onTraceIdFilterChange === 'function') {
       onTraceIdFilterChange('');
     }
-    if (onRefresh) onRefresh();
+    if (typeof onRefresh === 'function') onRefresh();
   };
 
   const handleClearQuery = () => {
     setQueryDraft('');
-    onSearchChange('');
-    if (onTraceIdFilterChange) onTraceIdFilterChange('');
-    if (onRefresh) onRefresh();
+    if (typeof onSearchChange === 'function') {
+      onSearchChange('');
+    }
+    if (typeof onTraceIdFilterChange === 'function') onTraceIdFilterChange('');
+    if (typeof onRefresh === 'function') onRefresh();
   };
 
   const handleKeyDown = (e) => {
@@ -153,41 +175,97 @@ export function TraceFilterToolbar({
     <TooltipProvider delayDuration={150}>
       <div className="sticky top-0 z-30 w-full rounded-none border-b dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f]/98 bg-white/98 backdrop-blur-md px-4 py-2.5 sm:px-6 shadow-sm transition-colors space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b dark:border-[#22252b] border-slate-200 pb-2.5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-[#f4f5f7]">
               <div className="flex h-7 w-7 items-center justify-center rounded bg-[#3274d9] text-white shadow-sm">
                 <Activity className="h-4 w-4" />
               </div>
-              <span className="tracking-tight">MES System Logs</span>
-              <span className="hidden sm:inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider dark:bg-[#22252b] bg-slate-100 dark:text-[#5794f2] text-blue-600 border dark:border-[#2c323f] border-slate-300">
-                APM Explorer
-              </span>
+              <span className="tracking-tight hidden sm:inline">MES APM</span>
             </div>
+
+            <nav className="flex items-center gap-1 bg-slate-100 dark:bg-[#111217] p-0.5 rounded-lg border border-slate-200 dark:border-[#2c323f]">
+              <NavLink
+                to="/system-logs"
+                className={cn(
+                  'px-2.5 py-1 text-xs font-medium rounded transition flex items-center gap-1.5',
+                  isSystemLogsActive
+                    ? 'bg-white dark:bg-[#22252b] text-[#3274d9] dark:text-[#5794f2] shadow-xs font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                )}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>System Logs</span>
+              </NavLink>
+              <NavLink
+                to="/system-logs/sql"
+                className={({ isActive }) =>
+                  cn(
+                    'px-2.5 py-1 text-xs font-medium rounded transition flex items-center gap-1.5',
+                    isActive
+                      ? 'bg-white dark:bg-[#22252b] text-[#3274d9] dark:text-[#5794f2] shadow-xs font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  )
+                }
+              >
+                <Database className="h-3.5 w-3.5" />
+                <span>SQL Analytics</span>
+              </NavLink>
+              <NavLink
+                to="/system-logs/errors"
+                className={({ isActive }) =>
+                  cn(
+                    'px-2.5 py-1 text-xs font-medium rounded transition flex items-center gap-1.5',
+                    isActive
+                      ? 'bg-white dark:bg-[#22252b] text-[#3274d9] dark:text-[#5794f2] shadow-xs font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  )
+                }
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>Error Tracking</span>
+              </NavLink>
+              <NavLink
+                to="/system-logs/health"
+                className={({ isActive }) =>
+                  cn(
+                    'px-2.5 py-1 text-xs font-medium rounded transition flex items-center gap-1.5',
+                    isActive
+                      ? 'bg-white dark:bg-[#22252b] text-[#3274d9] dark:text-[#5794f2] shadow-xs font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  )
+                }
+              >
+                <Activity className="h-3.5 w-3.5" />
+                <span>System Health</span>
+              </NavLink>
+            </nav>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 px-2 py-0.5 text-xs">
-              <span className="text-[11px] dark:text-[#8e94a0] text-slate-500">Rows/page:</span>
-              <Select
-                value={String(pageSize)}
-                onValueChange={(val) => onPageSizeChange(Number(val))}
-              >
-                <SelectTrigger className="h-6 border-0 bg-transparent px-1 py-0 text-[11px] font-sans text-cyan-600 dark:text-[#5794f2] focus-visible:ring-0">
-                  <SelectValue placeholder="20" />
-                </SelectTrigger>
-                <SelectContent className="dark:bg-[#181b1f] bg-white dark:border-[#2c323f] border-slate-200 dark:text-slate-200 text-slate-800">
-                  <SelectItem value="20" className="text-xs">
-                    20
-                  </SelectItem>
-                  <SelectItem value="50" className="text-xs">
-                    50
-                  </SelectItem>
-                  <SelectItem value="100" className="text-xs">
-                    100
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!isSubPage && onPageSizeChange && (
+              <div className="flex items-center gap-1.5 rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 px-2 py-0.5 text-xs">
+                <span className="text-[11px] dark:text-[#8e94a0] text-slate-500">Rows/page:</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(val) => onPageSizeChange(Number(val))}
+                >
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-1 py-0 text-[11px] font-sans text-cyan-600 dark:text-[#5794f2] focus-visible:ring-0">
+                    <SelectValue placeholder="20" />
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-[#181b1f] bg-white dark:border-[#2c323f] border-slate-200 dark:text-slate-200 text-slate-800">
+                    <SelectItem value="20" className="text-xs">
+                      20
+                    </SelectItem>
+                    <SelectItem value="50" className="text-xs">
+                      50
+                    </SelectItem>
+                    <SelectItem value="100" className="text-xs">
+                      100
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <TimeRangePicker
               timeRange={timeRange}
@@ -210,36 +288,38 @@ export function TraceFilterToolbar({
               <TooltipContent>Execute search query (Shortcut: Enter)</TooltipContent>
             </Tooltip>
 
-            <div className="flex items-center gap-1.5 rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 px-2 py-0.5 text-xs">
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  autoRefreshInterval > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                }`}
-              />
-              <span className="text-[11px] dark:text-[#8e94a0] text-slate-500">Live:</span>
-              <Select
-                value={String(autoRefreshInterval)}
-                onValueChange={(val) => onAutoRefreshChange(Number(val))}
-              >
-                <SelectTrigger className="h-6 border-0 bg-transparent px-1 py-0 text-[11px] font-sans text-emerald-500 dark:text-emerald-400 font-medium focus-visible:ring-0">
-                  <SelectValue placeholder="Off" />
-                </SelectTrigger>
-                <SelectContent className="dark:bg-[#181b1f] bg-white dark:border-[#2c323f] border-slate-200 dark:text-slate-200 text-slate-800">
-                  <SelectItem value="0" className="text-xs">
-                    Off
-                  </SelectItem>
-                  <SelectItem value="5" className="text-xs">
-                    5s
-                  </SelectItem>
-                  <SelectItem value="10" className="text-xs">
-                    10s
-                  </SelectItem>
-                  <SelectItem value="30" className="text-xs">
-                    30s
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!isSubPage && onAutoRefreshChange && (
+              <div className="flex items-center gap-1.5 rounded border dark:border-[#2c323f] border-slate-300 dark:bg-[#111217] bg-slate-50 px-2 py-0.5 text-xs">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    autoRefreshInterval > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                  }`}
+                />
+                <span className="text-[11px] dark:text-[#8e94a0] text-slate-500">Live:</span>
+                <Select
+                  value={String(autoRefreshInterval)}
+                  onValueChange={(val) => onAutoRefreshChange(Number(val))}
+                >
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-1 py-0 text-[11px] font-sans text-emerald-500 dark:text-emerald-400 font-medium focus-visible:ring-0">
+                    <SelectValue placeholder="Off" />
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-[#181b1f] bg-white dark:border-[#2c323f] border-slate-200 dark:text-slate-200 text-slate-800">
+                    <SelectItem value="0" className="text-xs">
+                      Off
+                    </SelectItem>
+                    <SelectItem value="5" className="text-xs">
+                      5s
+                    </SelectItem>
+                    <SelectItem value="10" className="text-xs">
+                      10s
+                    </SelectItem>
+                    <SelectItem value="30" className="text-xs">
+                      30s
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -326,60 +406,62 @@ export function TraceFilterToolbar({
           </div>
         </div>
 
-        <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 space-y-2.5 shadow-sm">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] dark:text-[#8e94a0] text-slate-500 mr-1 select-none font-medium">
-              Label filters:
-            </span>
-            {quickFilters.map((p) => (
-              <button
-                key={p.id}
-                onClick={p.onClick}
-                type="button"
-                className={`rounded px-2.5 py-0.5 text-xs font-sans transition border cursor-pointer ${
-                  p.active
-                    ? p.color || 'bg-[#3274d9]/20 text-[#5794f2] border-[#3274d9] font-medium'
-                    : 'dark:bg-[#111217] bg-slate-50 dark:text-[#8e94a0] text-slate-600 dark:border-[#2c323f] border-slate-300 hover:dark:text-white hover:dark:bg-[#22252b]'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="flex items-center gap-1 text-[11px] dark:text-[#8e94a0] text-slate-500 shrink-0 font-medium">
-              <span>Line contains</span>
-              <span className="text-slate-500">:</span>
+        {!isSubPage && (
+          <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-white p-3 space-y-2.5 shadow-sm">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] dark:text-[#8e94a0] text-slate-500 mr-1 select-none font-medium">
+                Label filters:
+              </span>
+              {quickFilters.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={p.onClick}
+                  type="button"
+                  className={`rounded px-2.5 py-0.5 text-xs font-sans transition border cursor-pointer ${
+                    p.active
+                      ? p.color || 'bg-[#3274d9]/20 text-[#5794f2] border-[#3274d9] font-medium'
+                      : 'dark:bg-[#111217] bg-slate-50 dark:text-[#8e94a0] text-slate-600 dark:border-[#2c323f] border-slate-300 hover:dark:text-white hover:dark:bg-[#22252b]'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-[#8e94a0] pointer-events-none" />
-              <Input
-                type="text"
-                value={queryDraft}
-                onChange={(e) => setQueryDraft(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Text to find (SQL query, parameters, URL path, WO, Model, Exception, or Trace ID)..."
-                className="pl-8 pr-20 h-7 text-xs font-sans dark:bg-[#111217] bg-slate-50 dark:border-[#2c323f] border-slate-300 dark:text-white text-slate-900 placeholder:text-slate-500 focus-visible:border-[#3274d9] rounded"
-              />
-              <div className="absolute right-2 top-1.5 flex items-center gap-1.5">
-                {queryDraft && (
-                  <button
-                    onClick={handleClearQuery}
-                    type="button"
-                    className="h-4 w-4 rounded-full flex items-center justify-center text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
-                    title="Clear input"
-                  >
-                    ✕
-                  </button>
-                )}
-                <kbd className="hidden sm:inline-block px-1.5 py-0.2 text-[9px] font-sans text-slate-400 border border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800 select-none">
-                  ↵ Enter
-                </kbd>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="flex items-center gap-1 text-[11px] dark:text-[#8e94a0] text-slate-500 shrink-0 font-medium">
+                <span>Line contains</span>
+                <span className="text-slate-500">:</span>
+              </div>
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-[#8e94a0] pointer-events-none" />
+                <Input
+                  type="text"
+                  value={queryDraft}
+                  onChange={(e) => setQueryDraft(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Text to find (SQL query, parameters, URL path, WO, Model, Exception, or Trace ID)..."
+                  className="pl-8 pr-20 h-7 text-xs font-sans dark:bg-[#111217] bg-slate-50 dark:border-[#2c323f] border-slate-300 dark:text-white text-slate-900 placeholder:text-slate-500 focus-visible:border-[#3274d9] rounded"
+                />
+                <div className="absolute right-2 top-1.5 flex items-center gap-1.5">
+                  {queryDraft && (
+                    <button
+                      onClick={handleClearQuery}
+                      type="button"
+                      className="h-4 w-4 rounded-full flex items-center justify-center text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                      title="Clear input"
+                    >
+                      ✕
+                    </button>
+                  )}
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.2 text-[9px] font-sans text-slate-400 border border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800 select-none">
+                    ↵ Enter
+                  </kbd>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </TooltipProvider>
   );
@@ -390,13 +472,13 @@ TraceFilterToolbar.propTypes = {
   timeRange: PropTypes.object,
   onChangeTimeRange: PropTypes.func,
   search: PropTypes.string,
-  onSearchChange: PropTypes.func.isRequired,
+  onSearchChange: PropTypes.func,
   traceIdFilter: PropTypes.string,
-  onTraceIdFilterChange: PropTypes.func.isRequired,
+  onTraceIdFilterChange: PropTypes.func,
   onlyErrors: PropTypes.bool,
-  onOnlyErrorsChange: PropTypes.func.isRequired,
+  onOnlyErrorsChange: PropTypes.func,
   onlySlow: PropTypes.bool,
-  onOnlySlowChange: PropTypes.func.isRequired,
+  onOnlySlowChange: PropTypes.func,
   onlySql: PropTypes.bool,
   onOnlySqlChange: PropTypes.func,
   onlyInfo: PropTypes.bool,
@@ -404,13 +486,14 @@ TraceFilterToolbar.propTypes = {
   onlyWarn: PropTypes.bool,
   onOnlyWarnChange: PropTypes.func,
   pageSize: PropTypes.number,
-  onPageSizeChange: PropTypes.func.isRequired,
+  onPageSizeChange: PropTypes.func,
   onRefresh: PropTypes.func.isRequired,
   loading: PropTypes.bool,
   onOpenFiles: PropTypes.func.isRequired,
   onLogout: PropTypes.func.isRequired,
   autoRefreshInterval: PropTypes.number,
-  onAutoRefreshChange: PropTypes.func.isRequired,
+  onAutoRefreshChange: PropTypes.func,
   resolvedTheme: PropTypes.string,
   toggleTheme: PropTypes.func,
+  isSubPage: PropTypes.bool,
 };

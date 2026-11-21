@@ -49,6 +49,24 @@ const SystemLogsPage = lazy(() =>
   }))
 );
 
+const SqlAnalyticsPage = lazy(() =>
+  import('@/features/system-logs').then((m) => ({
+    default: m.SqlAnalyticsPage,
+  }))
+);
+
+const ErrorTrackingPage = lazy(() =>
+  import('@/features/system-logs').then((m) => ({
+    default: m.ErrorTrackingPage,
+  }))
+);
+
+const SystemHealthPage = lazy(() =>
+  import('@/features/system-logs').then((m) => ({
+    default: m.SystemHealthPage,
+  }))
+);
+
 export const router = createBrowserRouter([
   {
     path: ROUTES.LOGIN,
@@ -129,7 +147,47 @@ export const router = createBrowserRouter([
     errorElement: <FullscreenRouteErrorPage />,
   },
   {
+    path: ROUTES.SYSTEM_LOGS_SQL,
+    element: <SqlAnalyticsPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: ROUTES.SYSTEM_LOGS_ERRORS,
+    element: <ErrorTrackingPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: ROUTES.SYSTEM_LOGS_HEALTH,
+    element: <SystemHealthPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: `${ROUTES.SYSTEM_LOGS}/:tab`,
+    element: <SystemLogsPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
     path: '/system/logs',
+    element: <SystemLogsPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: '/system/sql',
+    element: <SqlAnalyticsPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: '/system/errors',
+    element: <ErrorTrackingPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: '/system/health',
+    element: <SystemHealthPage />,
+    errorElement: <FullscreenRouteErrorPage />,
+  },
+  {
+    path: '/system/logs/:tab',
     element: <SystemLogsPage />,
     errorElement: <FullscreenRouteErrorPage />,
   },

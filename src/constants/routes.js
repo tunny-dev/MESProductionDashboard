@@ -9,4 +9,7 @@ export const ROUTES = {
   PRODUCTION_DASHBOARD: '/production-dashboard',
   PRODUCTION_BOARD: '/production-board',
   SYSTEM_LOGS: '/system-logs',
+  SYSTEM_LOGS_SQL: '/system-logs/sql',
+  SYSTEM_LOGS_ERRORS: '/system-logs/errors',
+  SYSTEM_LOGS_HEALTH: '/system-logs/health',
 };

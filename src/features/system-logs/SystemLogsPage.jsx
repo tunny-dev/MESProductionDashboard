@@ -1,6 +1,31 @@
-﻿import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Layers, Terminal, ChevronLeft, ChevronRight, Activity, Laptop } from 'lucide-react';
+﻿import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
+import {
+  Layers,
+  Terminal,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+  Laptop,
+  Network,
+} from 'lucide-react';
+
+const TAB_SLUG_MAP = {
+  waterfall: 'traces',
+  traces: 'traces',
+  routes: 'routes',
+  raw: 'stream',
+  stream: 'stream',
+  client: 'client',
+};
+
+const SLUG_TAB_MAP = {
+  traces: 'waterfall',
+  routes: 'routes',
+  stream: 'raw',
+  raw: 'raw',
+  client: 'client',
+};
 import { systemLogsService } from '@/services/system-logs.service';
 import { useSystemLogDates, useSystemLogTraces } from '@/hooks/useSystemLogs';
 import { CimdevAuthModal } from '@/features/system-logs/components/CimdevAuthModal';
@@ -12,6 +37,7 @@ import { TraceDetailSheet } from '@/features/system-logs/components/TraceDetailS
 import { LogStreamView } from '@/features/system-logs/components/LogStreamView';
 import { FilesModal } from '@/features/system-logs/components/FilesModal';
 import { ClientLogsTab } from '@/features/system-logs/components/ClientLogsTab';
+import { RouteAnalyticsTab } from '@/features/system-logs/components/RouteAnalyticsTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -19,10 +45,25 @@ import { useTheme } from '@/hooks/useTheme';
 
 export function SystemLogsPage() {
   const [searchParams] = useSearchParams();
+  const { tab } = useParams();
+  const navigate = useNavigate();
   const { resolvedTheme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState(
-    searchParams.get('tab') === 'client' ? 'client' : 'waterfall'
-  );
+
+  // URL-driven active tab synchronization
+  const activeTab = useMemo(() => {
+    if (tab && SLUG_TAB_MAP[tab]) {
+      return SLUG_TAB_MAP[tab];
+    }
+    if (searchParams.get('tab') === 'client') return 'client';
+    return 'waterfall';
+  }, [tab, searchParams]);
+
+  const handleTabChange = (newTab) => {
+    const slug = TAB_SLUG_MAP[newTab] || 'traces';
+    const targetPath = slug === 'traces' ? '/system-logs' : `/system-logs/${slug}`;
+    navigate(targetPath);
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!systemLogsService.getStoredAuth());
   const [showAuthModal, setShowAuthModal] = useState(!isAuthenticated);
 
@@ -64,7 +105,7 @@ export function SystemLogsPage() {
     };
   }, []);
 
-  // 1. React Query: Dates
+  // React Query: Dates
   const {
     data: dates = [],
     refetch: refetchDates,
@@ -80,7 +121,7 @@ export function SystemLogsPage() {
     }
   }, [dates, selectedDate]);
 
-  // 2. React Query: Traces with timeRange, filters, pagination, polling
+  // React Query: Traces with timeRange, filters, pagination, polling
   const {
     data: tracesData,
     isLoading,
@@ -399,7 +440,7 @@ export function SystemLogsPage() {
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-2.5">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <TabsList className="dark:bg-[#181b1f] bg-white border dark:border-[#22252b] border-slate-200 h-8 p-0.5 rounded shadow-sm">
                 <TabsTrigger
@@ -422,6 +463,13 @@ export function SystemLogsPage() {
                 >
                   <Laptop className="h-3.5 w-3.5 mr-1.5" />
                   Client FE Logs
+                </TabsTrigger>
+                <TabsTrigger
+                  value="routes"
+                  className="text-xs h-7 rounded data-[state=active]:bg-[#3274d9] data-[state=active]:text-white dark:data-[state=active]:bg-[#22252b] dark:data-[state=active]:text-[#5794f2] dark:data-[state=active]:border dark:data-[state=active]:border-[#3274d9] font-medium"
+                >
+                  <Network className="h-3.5 w-3.5 mr-1.5" />
+                  Route Analytics
                 </TabsTrigger>
               </TabsList>
 
@@ -537,6 +585,21 @@ export function SystemLogsPage() {
 
             <TabsContent value="client" className="m-0">
               <ClientLogsTab />
+            </TabsContent>
+
+            <TabsContent value="routes" className="m-0">
+              <RouteAnalyticsTab
+                traces={traces}
+                onFilterPath={(path) => {
+                  setSearch(path);
+                  handleTabChange('waterfall');
+                  setPage(1);
+                }}
+                onInspectTrace={(tr) => {
+                  setInspectTrace(tr);
+                  setIsSheetOpen(true);
+                }}
+              />
             </TabsContent>
           </Tabs>
         </div>

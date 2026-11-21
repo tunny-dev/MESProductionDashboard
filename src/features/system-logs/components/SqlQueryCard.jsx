@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   Sparkles,
+  Flame,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -33,6 +34,7 @@ export function SqlQueryCard({
   renderHighlightedSql,
   renderHighlightedParams,
   onOpenStudio,
+  duplicateInfo,
 }) {
   const [loadingMode, setLoadingMode] = useState(null); // 'data' | 'analyze' | null
   const [result, setResult] = useState(null);
@@ -114,6 +116,20 @@ export function SqlQueryCard({
           <span className="font-semibold dark:text-[#f4f5f7] text-slate-800 text-xs">
             {evt.eventType === 'slow_sql' ? 'SLOW QUERY (≥ 1000ms)' : 'DATABASE QUERY (SQL)'}
           </span>
+          {duplicateInfo?.isDuplicate && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  <Flame className="h-3 w-3" />
+                  {duplicateInfo.count}x Repeated ({duplicateInfo.totalDurationMs}ms total)
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                This statement pattern is repeated {duplicateInfo.count} times in this trace
+                (possible N+1 query loop).
+              </TooltipContent>
+            </Tooltip>
+          )}
           <span className="text-[11px] text-[#8e94a0] font-sans">
             +{evt.relativeOffsetMs}ms offset
           </span>
@@ -260,7 +276,7 @@ export function SqlQueryCard({
 
       {evt.sql && (
         <div
-          className={`relative rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed shadow-inner max-h-[500px] select-text ${getCodeClass()}`}
+          className={`relative rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed shadow-inner max-h-125 select-text ${getCodeClass()}`}
         >
           {renderHighlightedSql(evt.sql)}
         </div>
@@ -403,19 +419,25 @@ export function SqlQueryCard({
                       No rows match the filter criteria.
                     </div>
                   ) : (
-                    <div className="rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white overflow-auto max-h-[380px] shadow-inner">
+                    <div className="rounded border dark:border-[#22252b] border-slate-300 dark:bg-[#0c1017] bg-white overflow-auto max-h-95 shadow-inner">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead className="sticky top-0 z-10 dark:bg-[#181b1f] bg-slate-100 border-b dark:border-[#22252b] border-slate-300 shadow-sm">
                           <tr>
                             <th className="p-2 text-[11px] font-bold text-[#8e94a0] border-r dark:border-[#22252b] border-slate-200 w-10 text-center font-mono">
                               #
                             </th>
-                            {result.columns.map((col) => (
+                            {result.columns.map((col, cIdx) => (
                               <th
-                                key={col}
+                                key={`${col || 'col'}_${cIdx}`}
                                 className="p-2 text-[11px] font-bold dark:text-[#f4f5f7] text-slate-700 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200"
                               >
-                                {col}
+                                {col ? (
+                                  col
+                                ) : (
+                                  <span className="italic dark:text-[#8e94a0] text-slate-400 font-normal">
+                                    (No column name)
+                                  </span>
+                                )}
                               </th>
                             ))}
                           </tr>
@@ -429,12 +451,12 @@ export function SqlQueryCard({
                               <td className="p-2 text-[11px] text-[#8e94a0] font-mono tabular-nums text-center border-r dark:border-[#22252b] border-slate-200">
                                 {rIdx + 1}
                               </td>
-                              {result.columns.map((col) => {
+                              {result.columns.map((col, cIdx) => {
                                 const val = getRowValue(row, col);
                                 const isNull = val === null || val === undefined;
                                 return (
                                   <td
-                                    key={col}
+                                    key={`${col || 'col'}_${cIdx}`}
                                     className="p-2 whitespace-nowrap border-r dark:border-[#22252b] border-slate-200 text-xs select-text font-mono"
                                   >
                                     {isNull ? (
@@ -639,7 +661,7 @@ export function SqlQueryCard({
                     </div>
                   </div>
                   <div
-                    className={`rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed max-h-[380px] overflow-auto select-text ${getCodeClass()}`}
+                    className={`rounded-md border dark:border-[#22252b] border-slate-700 dark:bg-[#0c1017] bg-[#0c1017] p-4 font-mono text-xs text-slate-200 leading-relaxed max-h-95 overflow-auto select-text ${getCodeClass()}`}
                   >
                     {renderHighlightedSql(executableSql)}
                   </div>
@@ -666,4 +688,10 @@ SqlQueryCard.propTypes = {
   renderHighlightedSql: PropTypes.func.isRequired,
   renderHighlightedParams: PropTypes.func.isRequired,
   onOpenStudio: PropTypes.func,
+  duplicateInfo: PropTypes.shape({
+    isDuplicate: PropTypes.bool,
+    count: PropTypes.number,
+    totalDurationMs: PropTypes.number,
+    isNPlusOne: PropTypes.bool,
+  }),
 };

@@ -11,6 +11,10 @@ export const systemLogsService = {
     return getStoredLogAuth();
   },
 
+  isAuthenticated() {
+    return !!this.getStoredAuth();
+  },
+
   setStoredAuth(username, password) {
     setStoredLogAuth(username, password);
   },
@@ -49,8 +53,12 @@ export const systemLogsService = {
     to,
     search,
     traceId,
+    level,
     onlyErrors,
     onlySlow,
+    onlySql,
+    onlyInfo,
+    onlyWarn,
     page = 1,
     pageSize = 20,
     limit = 0,
@@ -62,8 +70,12 @@ export const systemLogsService = {
       if (to) params.to = to;
       if (search) params.search = search;
       if (traceId) params.traceId = traceId;
+      if (level) params.level = level;
       if (onlyErrors) params.onlyErrors = true;
       if (onlySlow) params.onlySlow = true;
+      if (onlySql) params.onlySql = true;
+      if (onlyInfo) params.onlyInfo = true;
+      if (onlyWarn) params.onlyWarn = true;
       if (page) params.page = page;
       if (pageSize) params.pageSize = pageSize;
       if (limit) params.limit = limit;

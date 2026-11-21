@@ -358,13 +358,13 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
 
   return (
     <div className="relative inline-flex items-center">
-      <div className="button-group inline-flex items-stretch rounded border border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] shadow-xs select-none h-8">
+      <div className="button-group inline-flex items-stretch rounded border border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] shadow-xs select-none h-8 box-border">
         <button
           type="button"
           onClick={handleStepBackward}
           title="Move time range backwards"
           aria-label="Move time range backwards"
-          className="h-8 px-2.5 flex items-center justify-center border-r border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
+          className="px-2.5 flex items-center justify-center border-r border-slate-300 dark:border-[#2c323f] hover:bg-slate-200/70 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer rounded-l-[3px]"
         >
           <AngleDoubleLeftIcon className="w-4 h-4" />
         </button>
@@ -385,7 +385,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
               <button
                 type="button"
                 aria-label={`Time range selected: ${activeLabel}`}
-                className="h-8 px-3 flex items-center gap-2 border-r border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-900 dark:text-[#f4f5f7] font-medium text-xs transition cursor-pointer"
+                className="px-3 flex items-center gap-2 border-r border-slate-300 dark:border-[#2c323f] hover:bg-slate-200/70 hover:dark:bg-[#22252b] text-slate-900 dark:text-[#f4f5f7] font-medium text-xs transition cursor-pointer"
               >
                 <ClockNineIcon className="w-4 h-4 text-slate-700 dark:text-[#c7d0d9]" />
                 <span className="font-semibold text-xs tracking-tight">{activeLabel}</span>
@@ -396,9 +396,9 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
             <PopoverContent
               align="start"
               sideOffset={6}
-              className="w-[94vw] max-w-[680px] p-0 dark:bg-[#181b1f] bg-white border dark:border-[#2c323f] border-slate-200 shadow-2xl rounded-lg overflow-hidden text-xs z-50"
+              className="w-[94vw] max-w-170 p-0 dark:bg-[#181b1f] bg-white border dark:border-[#2c323f] border-slate-200 shadow-2xl rounded-lg overflow-hidden text-xs z-50"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-12 min-h-[320px]">
+              <div className="grid grid-cols-1 sm:grid-cols-12 min-h-80">
                 <div className="sm:col-span-5 p-4 flex flex-col justify-between border-b sm:border-b-0 sm:border-r dark:border-[#22252b] border-slate-200 space-y-3 dark:bg-[#14161a] bg-slate-50/50">
                   <div className="space-y-3">
                     <div className="text-xs font-bold uppercase tracking-wider dark:text-slate-300 text-slate-700">
@@ -628,7 +628,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
           {isHovered && !isOpen && (
             <div className="absolute top-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-100 flex flex-col items-center">
               <div className="w-2.5 h-2.5 bg-white dark:bg-[#181b1f] border-t border-l border-slate-200 dark:border-[#2c323f] rotate-45 -mb-1.5 shadow-sm" />
-              <div className="bg-white dark:bg-[#181b1f] text-slate-800 dark:text-[#f4f5f7] border border-slate-200 dark:border-[#2c323f] rounded-lg shadow-xl px-4 py-2.5 text-center font-sans whitespace-nowrap min-w-[190px]">
+              <div className="bg-white dark:bg-[#181b1f] text-slate-800 dark:text-[#f4f5f7] border border-slate-200 dark:border-[#2c323f] rounded-lg shadow-xl px-4 py-2.5 text-center font-sans whitespace-nowrap min-w-47.5">
                 <div className="text-[13px] font-normal leading-tight text-slate-800 dark:text-[#f4f5f7]">
                   {hoverRange.fromStr}
                 </div>
@@ -652,7 +652,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
           onClick={handleStepForward}
           title="Move time range forwards"
           aria-label="Move time range forwards"
-          className="h-8 px-2.5 flex items-center justify-center border-r border-slate-300 dark:border-[#2c323f] bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
+          className="px-2.5 flex items-center justify-center border-r border-slate-300 dark:border-[#2c323f] hover:bg-slate-200/70 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
         >
           <AngleDoubleRightIcon className="w-4 h-4" />
         </button>
@@ -662,7 +662,7 @@ export function TimeRangePicker({ timeRange, onChangeTimeRange, availableDates =
           onClick={handleZoomOut}
           title="Zoom out time range"
           aria-label="Zoom out time range"
-          className="h-8 px-2.5 flex items-center justify-center bg-slate-50 dark:bg-[#181b1f] hover:bg-slate-100 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer"
+          className="px-2.5 flex items-center justify-center hover:bg-slate-200/70 hover:dark:bg-[#22252b] text-slate-700 dark:text-[#c7d0d9] transition cursor-pointer rounded-r-sm"
         >
           <SearchMinusIcon className="w-4 h-4" />
         </button>

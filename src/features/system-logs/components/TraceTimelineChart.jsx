@@ -140,7 +140,7 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-xs font-mono">
+          <div className="flex items-center gap-2 text-xs">
             <div className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-[#22252b] text-slate-700 dark:text-slate-300">
               <span className="text-[10px] text-slate-400 mr-1 uppercase">Total</span>
               <strong>{stats.total.toLocaleString()}</strong>
@@ -161,19 +161,6 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
             <div className="flex items-center rounded-lg border border-slate-200 dark:border-[#2b2e35] p-0.5 bg-slate-50 dark:bg-[#14161a]">
               <Button
                 size="sm"
-                variant={chartType === 'area' ? 'secondary' : 'ghost'}
-                onClick={() => setChartType('area')}
-                className={`h-6 px-2 text-xs gap-1 rounded-md ${
-                  chartType === 'area'
-                    ? 'bg-white dark:bg-[#22252b] shadow-xs font-semibold text-slate-900 dark:text-white'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Layers className="h-3 w-3" />
-                Area
-              </Button>
-              <Button
-                size="sm"
                 variant={chartType === 'bar' ? 'secondary' : 'ghost'}
                 onClick={() => setChartType('bar')}
                 className={`h-6 px-2 text-xs gap-1 rounded-md ${
@@ -185,6 +172,19 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                 <BarChart3 className="h-3 w-3" />
                 Bar
               </Button>
+              <Button
+                size="sm"
+                variant={chartType === 'area' ? 'secondary' : 'ghost'}
+                onClick={() => setChartType('area')}
+                className={`h-6 px-2 text-xs gap-1 rounded-md ${
+                  chartType === 'area'
+                    ? 'bg-white dark:bg-[#22252b] shadow-xs font-semibold text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Layers className="h-3 w-3" />
+                Area
+              </Button>
             </div>
           )}
         </div>
@@ -194,12 +194,13 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
         <div className="p-3.5 sm:px-5">
           <ChartContainer
             config={chartConfig}
-            className="aspect-auto h-[185px] sm:h-[220px] w-full"
+            className="aspect-auto h-46.25 sm:h-55 w-full cursor-pointer"
           >
             {chartType === 'area' ? (
               <AreaChart
                 data={chartData}
                 margin={{ left: -16, right: 8, top: 10, bottom: 0 }}
+                className="cursor-pointer"
                 onClick={(e) => {
                   if (e?.activePayload?.[0]?.payload && onSelectBucket) {
                     onSelectBucket(e.activePayload[0].payload);
@@ -240,14 +241,14 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                 />
 
                 <ChartTooltip
-                  cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8' }}
+                  cursor={{ strokeDasharray: '3 3', stroke: '#94a3b8', cursor: 'pointer' }}
                   content={
                     <ChartTooltipContent
                       indicator="dot"
                       labelFormatter={(val, payload) => {
                         const row = payload?.[0]?.payload;
                         return (
-                          <div className="flex items-center justify-between gap-4 font-mono pb-1 border-b border-border/50">
+                          <div className="flex items-center justify-between gap-4 pb-1 border-b border-border/50">
                             <span className="font-semibold text-cyan-500">Khung giờ: {val}</span>
                             <span className="text-[10px] text-muted-foreground">
                               Độ trễ TB: {row?.avgDuration || 0}ms
@@ -266,6 +267,8 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                   stroke="#ef4444"
                   strokeWidth={2}
                   stackId="a"
+                  cursor="pointer"
+                  className="cursor-pointer"
                 />
                 <Area
                   dataKey="slow"
@@ -274,6 +277,8 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                   stroke="#f59e0b"
                   strokeWidth={1.5}
                   stackId="a"
+                  cursor="pointer"
+                  className="cursor-pointer"
                 />
                 <Area
                   dataKey="ok"
@@ -282,6 +287,8 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                   stroke="#10b981"
                   strokeWidth={1.5}
                   stackId="a"
+                  cursor="pointer"
+                  className="cursor-pointer"
                 />
               </AreaChart>
             ) : (
@@ -314,13 +321,14 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                 />
 
                 <ChartTooltip
+                  cursor={{ fill: 'currentColor', opacity: 0.1, cursor: 'pointer' }}
                   content={
                     <ChartTooltipContent
                       indicator="dot"
                       labelFormatter={(val, payload) => {
                         const row = payload?.[0]?.payload;
                         return (
-                          <div className="flex items-center justify-between gap-4 font-mono pb-1 border-b border-border/50">
+                          <div className="flex items-center justify-between gap-4 pb-1 border-b border-border/50">
                             <span className="font-semibold text-[#3274d9] dark:text-[#5794f2]">
                               Time: {val}
                             </span>
@@ -334,9 +342,30 @@ export function TraceTimelineChart({ traces = [], timeline = [], onSelectBucket 
                   }
                 />
 
-                <Bar dataKey="ok" fill="#10b981" stackId="a" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="slow" fill="#f59e0b" stackId="a" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="error" fill="#ef4444" stackId="a" radius={[3, 3, 0, 0]} />
+                <Bar
+                  dataKey="ok"
+                  fill="#10b981"
+                  stackId="a"
+                  radius={[2, 2, 0, 0]}
+                  cursor="pointer"
+                  className="cursor-pointer"
+                />
+                <Bar
+                  dataKey="slow"
+                  fill="#f59e0b"
+                  stackId="a"
+                  radius={[2, 2, 0, 0]}
+                  cursor="pointer"
+                  className="cursor-pointer"
+                />
+                <Bar
+                  dataKey="error"
+                  fill="#ef4444"
+                  stackId="a"
+                  radius={[3, 3, 0, 0]}
+                  cursor="pointer"
+                  className="cursor-pointer"
+                />
               </BarChart>
             )}
           </ChartContainer>

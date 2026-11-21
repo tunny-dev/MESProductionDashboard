@@ -9,6 +9,9 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
+  Flame,
+  Clock,
+  Layers,
 } from 'lucide-react';
 import {
   Sheet,
@@ -20,14 +23,17 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { SqlQueryCard } from '@/features/system-logs/components/SqlQueryCard';
 import { SqlStudioModal } from '@/features/system-logs/components/SqlStudioModal';
+import { analyzeTrace, getSqlFingerprint } from '@/features/system-logs/utils/traceAnalytics';
 
 export function TraceDetailSheet({ trace, isOpen, onClose }) {
   const [copiedKey, setCopiedKey] = useState(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const [studioQueryIndex, setStudioQueryIndex] = useState(null);
+  const [sqlFilter, setSqlFilter] = useState('all'); // 'all' | 'duplicates' | 'slow'
 
   // Default mode: disable line wrapping ('nowrap') as requested
   const [viewMode] = useState('nowrap');
@@ -50,12 +56,42 @@ export function TraceDetailSheet({ trace, isOpen, onClose }) {
     clientIp = '',
     queryCount = 0,
     slowQueryCount = 0,
-    totalSqlDurationMs = 0,
     hasError = false,
     events = [],
   } = trace;
 
   const sqlEvents = events.filter((e) => e.eventType === 'sql' || e.eventType === 'slow_sql');
+  const traceAnalysis = analyzeTrace(trace);
+
+  // Map each SQL query with duplicate detection info
+  const enrichedSqlEvents = sqlEvents.map((evt, idx) => {
+    const rawSql =
+      evt.sql || (evt.message?.includes('| SQL:') ? evt.message.split('| SQL:')[1] : '');
+    const fp = getSqlFingerprint(rawSql);
+    const dupGroup = traceAnalysis.duplicateGroups.find((g) => g.fingerprint === fp);
+    return {
+      evt,
+      originalIdx: idx,
+      duplicateInfo: dupGroup
+        ? {
+            isDuplicate: true,
+            count: dupGroup.count,
+            totalDurationMs: dupGroup.totalDurationMs,
+            isNPlusOne: dupGroup.count >= 3,
+          }
+        : null,
+    };
+  });
+
+  const displayedSqlEvents = enrichedSqlEvents.filter(({ evt, duplicateInfo }) => {
+    if (sqlFilter === 'duplicates') {
+      return Boolean(duplicateInfo?.isDuplicate);
+    }
+    if (sqlFilter === 'slow') {
+      return (Number(evt.durationMs) || 0) >= 1000 || evt.eventType === 'slow_sql';
+    }
+    return true;
+  });
 
   const methodColors = {
     GET: 'bg-[#5794f2]/15 text-[#5794f2] border-[#5794f2]/30',
@@ -344,8 +380,8 @@ export function TraceDetailSheet({ trace, isOpen, onClose }) {
           side="right"
           className={`dark:bg-[#181b1f] bg-slate-50 dark:border-[#22252b] border-slate-200 dark:text-[#f4f5f7] text-slate-800 p-0 flex flex-col h-full shadow-2xl transition-all duration-300 ${
             isMaximized
-              ? '!w-screen !max-w-none inset-0'
-              : '!w-[92vw] !max-w-[92vw] sm:!max-w-[85vw] lg:!max-w-[1300px]'
+              ? 'w-screen! max-w-none! inset-0'
+              : 'w-[92vw]! max-w-[92vw]~ sm:max-w-[85vw]! lg:max-w-325~'
           }`}
         >
           <SheetHeader className="p-5 border-b dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-white">
@@ -486,10 +522,168 @@ export function TraceDetailSheet({ trace, isOpen, onClose }) {
 
             <TabsContent value="sql" className="flex-1 m-0 p-0 min-h-0">
               <ScrollArea className="h-[calc(100vh-175px)] p-6">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-xs font-semibold dark:text-[#f4f5f7] text-slate-800 uppercase tracking-wider">
-                    Execution Metrics
-                  </span>
+                {/* Layered Latency Distribution Panel */}
+                <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-white p-4 mb-4 shadow-sm">
+                  <div className="flex items-center justify-between text-xs font-semibold dark:text-slate-200 text-slate-800 mb-2.5">
+                    <span className="flex items-center gap-1.5">
+                      <Layers className="h-4 w-4 text-[#3274d9]" />
+                      Latency Distribution (Request Layers)
+                    </span>
+                    <div className="flex items-center gap-3 text-[11px] font-mono">
+                      <span className="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+                        DB: {traceAnalysis.dbPercent}% ({traceAnalysis.totalSqlMs}ms)
+                      </span>
+                      <span className="text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" />
+                        App: {traceAnalysis.appPercent}% ({traceAnalysis.appMs}ms)
+                      </span>
+                      <span className="text-[#8e94a0] border-l dark:border-[#2c323f] border-slate-200 pl-2">
+                        Total:{' '}
+                        <strong className="dark:text-white text-slate-900">
+                          {totalDurationMs} ms
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-slate-100 dark:bg-slate-800 mb-3.5 shadow-inner">
+                    <div
+                      className="h-full bg-indigo-500 dark:bg-indigo-600 transition-all"
+                      style={{ width: `${traceAnalysis.dbPercent}%` }}
+                      title={`Database: ${traceAnalysis.totalSqlMs}ms (${traceAnalysis.dbPercent}%)`}
+                    />
+                    <div
+                      className="h-full bg-sky-500 dark:bg-sky-600 transition-all"
+                      style={{ width: `${traceAnalysis.appPercent}%` }}
+                      title={`Server Logic: ${traceAnalysis.appMs}ms (${traceAnalysis.appPercent}%)`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-slate-50">
+                      <div className="text-[10px] uppercase text-[#8e94a0] font-semibold">
+                        Total Duration
+                      </div>
+                      <div className="text-xl font-bold font-mono dark:text-white text-slate-900 mt-1">
+                        {totalDurationMs} ms
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded border dark:border-indigo-900/40 border-indigo-100 dark:bg-indigo-950/20 bg-indigo-50/50">
+                      <div className="text-[10px] uppercase text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
+                        <Database className="h-3 w-3" /> Database Time
+                      </div>
+                      <div className="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
+                        {traceAnalysis.totalSqlMs} ms{' '}
+                        <span className="text-xs font-normal opacity-80">
+                          ({traceAnalysis.dbPercent}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded border dark:border-sky-900/40 border-sky-100 dark:bg-sky-950/20 bg-sky-50/50">
+                      <div className="text-[10px] uppercase text-sky-600 dark:text-sky-400 font-semibold flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Server Logic
+                      </div>
+                      <div className="text-xl font-bold font-mono text-sky-600 dark:text-sky-400 mt-1">
+                        {traceAnalysis.appMs} ms{' '}
+                        <span className="text-xs font-normal opacity-80">
+                          ({traceAnalysis.appPercent}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#181b1f] bg-slate-50">
+                      <div className="text-[10px] uppercase text-[#8e94a0] font-semibold">
+                        SQL Queries
+                      </div>
+                      <div className="text-xl font-bold font-mono dark:text-white text-slate-900 mt-1">
+                        {sqlEvents.length}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Repeated Query / N+1 Detection Alert */}
+                {traceAnalysis.hasDuplicates && (
+                  <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 mb-4 text-xs text-amber-500 flex items-start gap-2.5">
+                    <Flame className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+                    <div className="space-y-1">
+                      <div className="font-bold flex items-center gap-2">
+                        <span>Repeated Query / N+1 Problem Detected</span>
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 text-amber-500 text-[10px] py-0"
+                        >
+                          {traceAnalysis.isNPlusOne ? 'High Severity (≥3x)' : 'Warning (2x)'}
+                        </Badge>
+                      </div>
+                      <div className="dark:text-slate-300 text-slate-700 leading-relaxed font-sans text-[11px]">
+                        Detected <strong>{traceAnalysis.duplicateGroups.length}</strong> statement
+                        pattern(s) executed <strong>{traceAnalysis.totalDuplicateQueries}</strong>{' '}
+                        times in this single request. Total duration spent on repeated queries:{' '}
+                        <strong>
+                          {traceAnalysis.duplicateGroups.reduce(
+                            (acc, g) => acc + g.totalDurationMs,
+                            0
+                          )}{' '}
+                          ms
+                        </strong>
+                        . Consider batching (
+                        <code className="text-amber-400">WHERE ... IN (...)</code>) or
+                        eager-loading.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filter Toolbar & SQL Studio Action */}
+                <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSqlFilter('all')}
+                      className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                        sqlFilter === 'all'
+                          ? 'bg-[#3274d9] text-white'
+                          : 'dark:text-[#8e94a0] text-slate-600 hover:dark:text-white hover:bg-slate-200/50 dark:hover:bg-[#22252b]'
+                      }`}
+                    >
+                      All Queries ({sqlEvents.length})
+                    </button>
+
+                    {traceAnalysis.hasDuplicates && (
+                      <button
+                        type="button"
+                        onClick={() => setSqlFilter('duplicates')}
+                        className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                          sqlFilter === 'duplicates'
+                            ? 'bg-amber-500 text-slate-950 font-bold'
+                            : 'text-amber-500 hover:bg-amber-500/10'
+                        }`}
+                      >
+                        <Flame className="h-3 w-3" />
+                        Repeated &amp; N+1 ({traceAnalysis.totalDuplicateQueries})
+                      </button>
+                    )}
+
+                    {slowQueryCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSqlFilter('slow')}
+                        className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                          sqlFilter === 'slow'
+                            ? 'bg-[#faad14] text-slate-950 font-bold'
+                            : 'text-[#faad14] hover:bg-[#faad14]/10'
+                        }`}
+                      >
+                        <Clock className="h-3 w-3" />
+                        Slow ≥ 1s ({slowQueryCount})
+                      </button>
+                    )}
+                  </div>
+
                   {sqlEvents.length > 0 && (
                     <Button
                       size="sm"
@@ -502,52 +696,26 @@ export function TraceDetailSheet({ trace, isOpen, onClose }) {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                  <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-white p-4 text-center shadow-sm">
-                    <div className="text-xs dark:text-[#8e94a0] text-slate-500 uppercase font-semibold">
-                      Total SQL Queries
-                    </div>
-                    <div className="text-2xl font-bold font-sans text-[#5794f2] mt-1">
-                      {queryCount}
-                    </div>
-                  </div>
-                  <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-white p-4 text-center shadow-sm">
-                    <div className="text-xs dark:text-[#8e94a0] text-slate-500 uppercase font-semibold">
-                      Total SQL Duration
-                    </div>
-                    <div className="text-2xl font-bold font-sans text-[#73bf69] mt-1">
-                      {totalSqlDurationMs.toFixed(1)} ms
-                    </div>
-                  </div>
-                  <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-white p-4 text-center shadow-sm">
-                    <div className="text-xs dark:text-[#8e94a0] text-slate-500 uppercase font-semibold">
-                      Slow Queries (≥ 1s)
-                    </div>
-                    <div
-                      className={`text-2xl font-bold font-sans mt-1 ${
-                        slowQueryCount > 0 ? 'text-[#faad14]' : 'text-[#8e94a0]'
-                      }`}
-                    >
-                      {slowQueryCount}
-                    </div>
-                  </div>
-                </div>
-
-                {sqlEvents.length === 0 ? (
+                {displayedSqlEvents.length === 0 ? (
                   <div className="rounded border dark:border-[#22252b] border-slate-200 dark:bg-[#111217] bg-white p-12 text-center text-[#8e94a0] text-xs">
-                    No SQL query statements recorded in this Trace.
+                    {sqlFilter === 'duplicates'
+                      ? 'No repeated or duplicate queries match this filter.'
+                      : sqlFilter === 'slow'
+                        ? 'No queries exceed 1000ms duration.'
+                        : 'No SQL query statements recorded in this Trace.'}
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {sqlEvents.map((evt, idx) => (
+                    {displayedSqlEvents.map(({ evt, originalIdx, duplicateInfo }) => (
                       <SqlQueryCard
-                        key={idx}
+                        key={originalIdx}
                         evt={evt}
-                        idx={idx}
+                        idx={originalIdx}
+                        duplicateInfo={duplicateInfo}
                         getCodeClass={getCodeClass}
                         renderHighlightedSql={renderHighlightedSql}
                         renderHighlightedParams={renderHighlightedParams}
-                        onOpenStudio={() => setStudioQueryIndex(idx)}
+                        onOpenStudio={() => setStudioQueryIndex(originalIdx)}
                       />
                     ))}
                   </div>
@@ -674,7 +842,7 @@ export function TraceDetailSheet({ trace, isOpen, onClose }) {
                   {events.map((evt, idx) => (
                     <div
                       key={idx}
-                      className="p-2.5 rounded hover:bg-white/[0.03] transition flex items-start gap-2.5 border-b dark:border-[#22252b] border-slate-800 pb-2.5"
+                      className="p-2.5 rounded hover:bg-white/3 transition flex items-start gap-2.5 border-b dark:border-[#22252b] border-slate-800 pb-2.5"
                     >
                       <span className="text-[#8e94a0] shrink-0 select-none">
                         {String(idx + 1).padStart(2, '0')}

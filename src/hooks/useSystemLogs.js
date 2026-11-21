@@ -47,25 +47,17 @@ export function useSystemLogTraces({
   autoRefreshInterval = 0,
   enabled = true,
 }) {
-  let effSearch = search || '';
-  if (onlySql && !effSearch.includes('SQL') && !effSearch.includes('Dapper')) {
-    effSearch = effSearch ? `${effSearch} SQL` : 'SQL';
-  }
-  if (onlyInfo && !effSearch.includes('Information')) {
-    effSearch = effSearch ? `${effSearch} Information` : 'Information';
-  }
-  if (onlyWarn && !effSearch.includes('Warning')) {
-    effSearch = effSearch ? `${effSearch} Warning` : 'Warning';
-  }
-
   const queryParams = {
     date,
     from,
     to,
-    search: effSearch,
+    search: search || undefined,
     traceId,
-    onlyErrors,
-    onlySlow,
+    onlyErrors: Boolean(onlyErrors),
+    onlySlow: Boolean(onlySlow),
+    onlySql: Boolean(onlySql),
+    onlyInfo: Boolean(onlyInfo),
+    onlyWarn: Boolean(onlyWarn),
     page,
     pageSize,
   };

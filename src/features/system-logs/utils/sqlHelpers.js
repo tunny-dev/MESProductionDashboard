@@ -35,8 +35,17 @@ export function inlineSqlParameters(sql, paramsJson) {
  * Handles differences between SQL column names (PascalCase/UPPER) and JSON serializer keys (camelCase)
  */
 export function getRowValue(row, colName) {
-  if (!row || !colName) return undefined;
+  if (!row || colName === null || colName === undefined) return undefined;
   if (row[colName] !== undefined) return row[colName];
+
+  // Hỗ trợ fallback tương thích trường hợp cột không có alias giữa các phiên bản
+  if (colName === '(No column name)' && row[''] !== undefined) {
+    return row[''];
+  }
+  if (colName === '' && row['(No column name)'] !== undefined) {
+    return row['(No column name)'];
+  }
+
   const lower = String(colName).toLowerCase();
   for (const key of Object.keys(row)) {
     if (key.toLowerCase() === lower) {

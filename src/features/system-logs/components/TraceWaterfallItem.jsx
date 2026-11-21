@@ -11,10 +11,12 @@ import {
   Clock,
   Eye,
   Filter,
+  Flame,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { analyzeTrace } from '@/features/system-logs/utils/traceAnalytics';
 
 export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
   const [expanded, setExpanded] = useState(false);
@@ -34,6 +36,17 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
     hasError = false,
     events = [],
   } = trace;
+
+  const {
+    totalSqlMs,
+    appMs,
+    dbPercent,
+    appPercent,
+    hasDuplicates,
+    isNPlusOne,
+    totalDuplicateQueries,
+    maxDuplicateCount,
+  } = analyzeTrace(trace);
 
   const handleCopySql = (sql, id, e) => {
     e.stopPropagation();
@@ -138,6 +151,27 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
               </Badge>
             )}
 
+            {hasDuplicates && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/40 text-amber-500 bg-amber-500/10 font-sans text-xs font-semibold rounded cursor-pointer"
+                  >
+                    <Flame className="h-3 w-3 mr-1 text-amber-500" />
+                    {isNPlusOne
+                      ? `N+1 (${maxDuplicateCount}x)`
+                      : `${totalDuplicateQueries} dup SQL`}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isNPlusOne
+                    ? `Possible N+1 Query detected! ${maxDuplicateCount} repeated queries with identical pattern.`
+                    : `${totalDuplicateQueries} duplicate queries detected.`}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             <div
               className={`flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs font-sans ${
                 isSlow
@@ -148,6 +182,49 @@ export function TraceWaterfallItem({ trace, onInspect, onFilterTraceId }) {
               <Clock className="h-3 w-3 text-[#8e94a0]" />
               <span>{totalDurationMs} ms</span>
             </div>
+
+            {totalDurationMs > 0 && queryCount > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded border dark:border-[#2c323f] border-slate-200 dark:bg-[#111217] bg-slate-100 text-[11px] cursor-help">
+                    <div className="w-14 h-2 rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-800">
+                      <div
+                        className="h-full bg-indigo-500 dark:bg-indigo-600 transition-all"
+                        style={{ width: `${dbPercent}%` }}
+                      />
+                      <div
+                        className="h-full bg-sky-500 dark:bg-sky-600 transition-all"
+                        style={{ width: `${appPercent}%` }}
+                      />
+                    </div>
+                    <span className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                      {dbPercent}% DB
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="flex flex-col items-stretch gap-2 p-3 min-w-[240px] text-xs bg-slate-900 text-slate-100 border border-slate-700 shadow-xl rounded-lg">
+                  <div className="font-bold border-b border-slate-700/80 pb-1.5 text-slate-200">
+                    Latency Distribution
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-indigo-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" /> Database:
+                    </span>
+                    <span className="font-mono font-semibold text-slate-100">
+                      {totalSqlMs} ms ({dbPercent}%)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sky-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" /> Server Logic:
+                    </span>
+                    <span className="font-mono font-semibold text-slate-100">
+                      {appMs} ms ({appPercent}%)
+                    </span>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
             <div className="flex items-center rounded border dark:border-[#2c323f] border-slate-200 dark:bg-[#111217] bg-slate-100 px-2 py-1 text-xs">
               <span className="font-sans text-[11px] text-[#3274d9] dark:text-[#5794f2] select-all tracking-tight mr-1.5 font-medium">
