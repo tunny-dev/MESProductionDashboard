@@ -86,6 +86,9 @@ export function OutputChart({
               ? calculateAchievement(actual, planned)
               : Number(finalStationOutput?.achievement) || 0;
 
+        // Nếu UPH thực tế không đạt với mục tiêu -> đánh dấu để trên biểu đồ hiển thị màu đỏ
+        const isUnderTarget = !isFuture && planned > 0 && actual < planned;
+
         return {
           label: slot.label,
           plannedOutput: planned,
@@ -93,6 +96,7 @@ export function OutputChart({
           achievement,
           isCurrent,
           isFuture,
+          isUnderTarget,
         };
       }),
     [visibleSlots, hourly, visibleSlotStates, finalStationId, targetUph]
@@ -243,6 +247,7 @@ export function OutputChart({
                 {chartData.map((point) => (
                   <Cell
                     key={`actual-${point.label}`}
+                    fill={point.isUnderTarget ? 'var(--danger)' : 'var(--color-actualOutput)'}
                     fillOpacity={point.isCurrent ? 0.85 : 1}
                     stroke={point.isCurrent ? 'var(--production-cyan, #38bdf8)' : undefined}
                     strokeWidth={point.isCurrent ? 2 : 0}
@@ -255,7 +260,23 @@ export function OutputChart({
                 type="monotone"
                 stroke="var(--color-achievement)"
                 strokeWidth={2}
-                dot={{ r: 3, fill: 'var(--chart-3)', stroke: 'var(--surface)' }}
+                dot={(props) => {
+                  const { cx, cy, index } = props;
+                  if (cx == null || cy == null) return null;
+                  const point = chartData[index];
+                  const isUnderTarget = point?.isUnderTarget;
+                  return (
+                    <circle
+                      key={`dot-${point?.label ?? index}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3}
+                      fill={isUnderTarget ? 'var(--danger)' : 'var(--chart-3)'}
+                      stroke="var(--surface)"
+                      strokeWidth={1}
+                    />
+                  );
+                }}
                 activeDot={false}
                 isAnimationActive={false}
                 connectNulls={true}
@@ -263,13 +284,24 @@ export function OutputChart({
                 <LabelList
                   dataKey="achievement"
                   position="top"
-                  formatter={(value) => {
-                    if (value == null || !Number.isFinite(Number(value))) return '';
-                    return `${Math.round(value)}%`;
+                  content={({ x, y, value, index }) => {
+                    if (value == null || !Number.isFinite(Number(value))) return null;
+                    if (x == null || y == null) return null;
+                    const point = chartData[index];
+                    const isUnderTarget = point?.isUnderTarget;
+                    return (
+                      <text
+                        x={x}
+                        y={y - 8}
+                        fill={isUnderTarget ? 'var(--danger)' : 'var(--chart-3)'}
+                        fontSize={10}
+                        textAnchor="middle"
+                        fontWeight="500"
+                      >
+                        {`${Math.round(value)}%`}
+                      </text>
+                    );
                   }}
-                  fill="var(--chart-3)"
-                  fontSize={10}
-                  offset={8}
                 />
               </Line>
               <ChartTooltip

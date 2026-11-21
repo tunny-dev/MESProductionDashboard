@@ -70,11 +70,17 @@ export function UphTrendChart({
         const targetVal =
           point?.targetUph ?? point?.target ?? point?.uphTarget ?? configuredTarget ?? null;
 
+        // Nếu UPH thực tế không đạt với mục tiêu -> đánh dấu để trên biểu đồ hiển thị màu đỏ
+        const actual = Number(actualVal) || 0;
+        const target = targetVal != null ? Number(targetVal) : null;
+        const isUnderTarget = !isFuture && target != null && target > 0 && actual < target;
+
         return {
           label: slot.label,
-          actual: Number(actualVal) || 0,
-          target: targetVal != null ? Number(targetVal) : null,
+          actual,
+          target,
           isFuture,
+          isUnderTarget,
         };
       }),
     [visibleSlots, trend, visibleSlotStates, stationTrend, configuredTarget]
@@ -189,7 +195,23 @@ export function UphTrendChart({
                 fill={`url(#fillUphActual-${gradientId})`}
                 stroke="var(--color-actual)"
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: 'var(--chart-4)', stroke: 'var(--surface)' }}
+                dot={(props) => {
+                  const { cx, cy, index } = props;
+                  if (cx == null || cy == null) return null;
+                  const point = chartData[index];
+                  const isUnderTarget = point?.isUnderTarget;
+                  return (
+                    <circle
+                      key={`uph-dot-${point?.label ?? index}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3}
+                      fill={isUnderTarget ? 'var(--danger)' : 'var(--chart-4)'}
+                      stroke="var(--surface)"
+                      strokeWidth={1}
+                    />
+                  );
+                }}
                 activeDot={{ r: 4 }}
                 connectNulls={true}
                 isAnimationActive={false}
@@ -197,12 +219,24 @@ export function UphTrendChart({
                 <LabelList
                   dataKey="actual"
                   position="top"
-                  formatter={(value) =>
-                    value == null || !Number.isFinite(Number(value)) ? '' : formatNumber(value)
-                  }
-                  fill="var(--chart-4)"
-                  fontSize={10}
-                  offset={8}
+                  content={({ x, y, value, index }) => {
+                    if (value == null || !Number.isFinite(Number(value))) return null;
+                    if (x == null || y == null) return null;
+                    const point = chartData[index];
+                    const isUnderTarget = point?.isUnderTarget;
+                    return (
+                      <text
+                        x={x}
+                        y={y - 8}
+                        fill={isUnderTarget ? 'var(--danger)' : 'var(--chart-4)'}
+                        fontSize={10}
+                        textAnchor="middle"
+                        fontWeight="500"
+                      >
+                        {formatNumber(value)}
+                      </text>
+                    );
+                  }}
                 />
               </Area>
             </AreaChart>

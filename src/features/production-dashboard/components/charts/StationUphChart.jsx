@@ -26,12 +26,22 @@ export function StationUphChart({
 }) {
   const chartData = useMemo(
     () =>
-      stations.map((station) => ({
-        stationId: station.stationId,
-        targetUph: station.targetUph,
-        actualUph: station.actualUph,
-        bottleneck: station.stationId === bottleneckId,
-      })),
+      stations.map((station) => {
+        const target = station.targetUph != null ? Number(station.targetUph) : null;
+        const actual = station.actualUph != null ? Number(station.actualUph) : null;
+        const isBottleneck = station.stationId === bottleneckId;
+
+        // Nếu UPH thực tế không đạt với mục tiêu -> đánh dấu để trên biểu đồ hiển thị màu đỏ
+        const isUnderTarget =
+          isBottleneck || (target != null && target > 0 && actual !== null && actual < target);
+        return {
+          stationId: station.stationId,
+          targetUph: target,
+          actualUph: actual,
+          bottleneck: isBottleneck,
+          isUnderTarget,
+        };
+      }),
     [stations, bottleneckId]
   );
 
@@ -151,15 +161,30 @@ export function StationUphChart({
                 {chartData.map((point) => (
                   <Cell
                     key={point.stationId}
-                    fill={point.bottleneck ? 'var(--danger)' : 'var(--color-actualUph)'}
+                    fill={point.isUnderTarget ? 'var(--danger)' : 'var(--color-actualUph)'}
                   />
                 ))}
                 <LabelList
                   dataKey="actualUph"
                   position="top"
-                  formatter={(val) => (val != null ? formatNumber(val) : '')}
-                  fill="var(--chart-2)"
-                  fontSize={9}
+                  content={({ x, y, width, value, index }) => {
+                    if (value == null || value === '') return null;
+                    if (x == null || y == null) return null;
+                    const point = chartData[index];
+                    const isUnderTarget = point?.isUnderTarget;
+                    return (
+                      <text
+                        x={x + (width ?? 0) / 2}
+                        y={y - 4}
+                        fill={isUnderTarget ? 'var(--danger)' : 'var(--chart-2)'}
+                        fontSize={9}
+                        textAnchor="middle"
+                        fontWeight="500"
+                      >
+                        {formatNumber(value)}
+                      </text>
+                    );
+                  }}
                 />
               </Bar>
             </BarChart>
