@@ -1,4 +1,7 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import PropTypes from 'prop-types';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -73,40 +76,37 @@ export function TraceFilterToolbar({
     location.pathname === '/system/logs' ||
     /^\/system(-logs)?\/(traces|routes|stream|raw|client)/.test(location.pathname);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const [queryDraft, setQueryDraft] = useState(search || traceIdFilter || '');
+  const queryForm = useForm({
+    resolver: zodResolver(z.object({ query: z.string().trim() })),
+    defaultValues: { query: search || traceIdFilter || '' },
+  });
+  const queryDraft = useWatch({ control: queryForm.control, name: 'query' });
+  const resetQuery = queryForm.reset;
 
-  // Keep draft in sync if external search prop changes (e.g. from chip or clear)
   useEffect(() => {
-    setQueryDraft(search || traceIdFilter || '');
-  }, [search, traceIdFilter]);
+    resetQuery({ query: search || traceIdFilter || '' });
+  }, [resetQuery, search, traceIdFilter]);
 
-  const handleExecuteQuery = () => {
-    const trimmed = queryDraft.trim();
+  const executeQuery = ({ query }) => {
     if (typeof onSearchChange === 'function') {
-      onSearchChange(trimmed);
+      onSearchChange(query);
     }
-    if (/^[a-fA-F0-9]{32}$/.test(trimmed)) {
-      if (typeof onTraceIdFilterChange === 'function') onTraceIdFilterChange(trimmed);
+    if (/^[a-fA-F0-9]{32}$/.test(query)) {
+      if (typeof onTraceIdFilterChange === 'function') onTraceIdFilterChange(query);
     } else if (typeof onTraceIdFilterChange === 'function') {
       onTraceIdFilterChange('');
     }
     if (typeof onRefresh === 'function') onRefresh();
   };
+  const handleExecuteQuery = queryForm.handleSubmit(executeQuery);
 
   const handleClearQuery = () => {
-    setQueryDraft('');
+    queryForm.reset({ query: '' });
     if (typeof onSearchChange === 'function') {
       onSearchChange('');
     }
     if (typeof onTraceIdFilterChange === 'function') onTraceIdFilterChange('');
     if (typeof onRefresh === 'function') onRefresh();
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleExecuteQuery();
-    }
   };
 
   const quickFilters = [
@@ -428,18 +428,24 @@ export function TraceFilterToolbar({
               ))}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="flex items-center gap-1 text-[11px] dark:text-[#8e94a0] text-slate-500 shrink-0 font-medium">
+            <form
+              onSubmit={handleExecuteQuery}
+              className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+            >
+              <label
+                htmlFor="trace-query-filter"
+                className="flex items-center gap-1 text-[11px] dark:text-[#8e94a0] text-slate-500 shrink-0 font-medium"
+              >
                 <span>Line contains</span>
                 <span className="text-slate-500">:</span>
-              </div>
+              </label>
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-[#8e94a0] pointer-events-none" />
                 <Input
+                  id="trace-query-filter"
                   type="text"
-                  value={queryDraft}
-                  onChange={(e) => setQueryDraft(e.target.value)}
-                  onKeyDown={handleKeyDown}
+                  aria-invalid={Boolean(queryForm.formState.errors.query)}
+                  {...queryForm.register('query')}
                   placeholder="Text to find (SQL query, parameters, URL path, WO, Model, Exception, or Trace ID)..."
                   className="pl-8 pr-20 h-7 text-xs font-sans dark:bg-[#111217] bg-slate-50 dark:border-[#2c323f] border-slate-300 dark:text-white text-slate-900 placeholder:text-slate-500 focus-visible:border-[#3274d9] rounded"
                 />
@@ -459,7 +465,7 @@ export function TraceFilterToolbar({
                   </kbd>
                 </div>
               </div>
-            </div>
+            </form>
           </div>
         )}
       </div>

@@ -1,6 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import {
   Dialog,
   DialogClose,
@@ -21,9 +25,18 @@ import {
 } from '@/components/ui/select';
 import { useLines } from '@/hooks/useLine';
 
+const linePickerSchema = z.object({
+  process: z.string().min(1, 'Select a process.'),
+  lineId: z.string().min(1, 'Select a production line.'),
+});
+
 export function LinePickerDialog({ open, onOpenChange, stageList = [], onApply, copy }) {
-  const [process, setProcess] = useState(null);
-  const [selectedLine, setSelectedLine] = useState(null);
+  const form = useForm({
+    resolver: zodResolver(linePickerSchema),
+    defaultValues: { process: '', lineId: '' },
+  });
+  const process = useWatch({ control: form.control, name: 'process' });
+  const selectedLineId = useWatch({ control: form.control, name: 'lineId' });
 
   const deptCode = useMemo(() => {
     if (!process) return null;
@@ -35,14 +48,20 @@ export function LinePickerDialog({ open, onOpenChange, stageList = [], onApply, 
 
   const processes = stageList.map((s) => (typeof s === 'string' ? s : s.id));
 
+  const selectedLine = lines.find((line) => line.id === selectedLineId) ?? null;
+
   function handleProcessChange(next) {
-    setProcess(next);
-    setSelectedLine(null);
+    form.setValue('process', next, { shouldDirty: true, shouldValidate: false });
+    form.setValue('lineId', '', { shouldDirty: true, shouldValidate: false });
   }
 
   function handleLineChange(id) {
-    const line = lines.find((l) => l.id === id) ?? null;
-    setSelectedLine(line);
+    form.setValue('lineId', id, { shouldDirty: true, shouldValidate: true });
+  }
+
+  function handleApply({ process: selectedProcess, lineId }) {
+    const line = lines.find((item) => item.id === lineId);
+    if (line) onApply(line.id, selectedProcess);
   }
 
   // Reset line select khi đổi process - dùng key để force remount
@@ -55,72 +74,95 @@ export function LinePickerDialog({ open, onOpenChange, stageList = [], onApply, 
           <DialogTitle>{copy.picker.title}</DialogTitle>
           <DialogDescription>{copy.picker.description}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
-          <div className="grid gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              {copy.filters.process}
-            </span>
-            <Select value={process ?? ''} onValueChange={handleProcessChange}>
-              <SelectTrigger className="w-full border-border-strong bg-[var(--surface)]">
-                <SelectValue placeholder={copy.filters.selectProcess} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel className="text-production-blue">{copy.filters.process}</SelectLabel>
-                  {processes.map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {group}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{copy.filters.line}</span>
-            <Select
-              key={lineSelectKey}
-              onValueChange={handleLineChange}
-              disabled={!process || linesLoading}
-            >
-              <SelectTrigger className="w-full border-border-strong bg-[var(--surface)]">
-                {selectedLine ? (
-                  <span className="flex-1 truncate text-left">{selectedLine.name}</span>
-                ) : (
-                  <span className="flex-1 truncate text-left text-muted-foreground">
-                    {copy.picker.linePlaceholder}
-                  </span>
-                )}
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel className="text-production-blue">{copy.filters.line}</SelectLabel>
-                  {lines.map((line) => (
-                    <SelectItem key={line.id} value={line.id}>
-                      {line.name || line.id}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter className="gap-2">
-          <DialogClose
-            render={
-              <Button type="button" variant="outline">
-                {copy.picker.cancel}
-              </Button>
-            }
-          />
-          <Button
-            type="button"
-            disabled={!selectedLine}
-            onClick={() => selectedLine && onApply(selectedLine.id, process)}
-          >
-            {copy.picker.apply}
-          </Button>
-        </DialogFooter>
+        <form onSubmit={form.handleSubmit(handleApply)} className="flex flex-col gap-3">
+          <FieldGroup>
+            <Controller
+              control={form.control}
+              name="process"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="line-picker-process">{copy.filters.process}</FieldLabel>
+                  <Select value={field.value} onValueChange={handleProcessChange}>
+                    <SelectTrigger
+                      id="line-picker-process"
+                      aria-invalid={fieldState.invalid}
+                      className="w-full border-border-strong bg-[var(--surface)]"
+                    >
+                      <SelectValue placeholder={copy.filters.selectProcess} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel className="text-production-blue">
+                          {copy.filters.process}
+                        </SelectLabel>
+                        {processes.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldError>{fieldState.error?.message}</FieldError>
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="lineId"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="line-picker-line">{copy.filters.line}</FieldLabel>
+                  <Select
+                    key={lineSelectKey}
+                    value={field.value}
+                    onValueChange={handleLineChange}
+                    disabled={!process || linesLoading}
+                  >
+                    <SelectTrigger
+                      id="line-picker-line"
+                      aria-invalid={fieldState.invalid}
+                      className="w-full border-border-strong bg-[var(--surface)]"
+                    >
+                      {selectedLine ? (
+                        <span className="flex-1 truncate text-left">{selectedLine.name}</span>
+                      ) : (
+                        <span className="flex-1 truncate text-left text-muted-foreground">
+                          {copy.picker.linePlaceholder}
+                        </span>
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel className="text-production-blue">
+                          {copy.filters.line}
+                        </SelectLabel>
+                        {lines.map((line) => (
+                          <SelectItem key={line.id} value={line.id}>
+                            {line.name || line.id}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldError>{fieldState.error?.message}</FieldError>
+                </Field>
+              )}
+            />
+          </FieldGroup>
+          <DialogFooter className="gap-2">
+            <DialogClose
+              render={
+                <Button type="button" variant="outline">
+                  {copy.picker.cancel}
+                </Button>
+              }
+            />
+            <Button type="submit" disabled={form.formState.isSubmitting || !selectedLine}>
+              {copy.picker.apply}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
