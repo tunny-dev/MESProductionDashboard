@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: mes-production-dashboard
+  group: mes-production-dashboard-client
   cancel-in-progress: false
 
 jobs:
@@ -19,14 +19,14 @@ jobs:
         shell: powershell
 
     env:
-      SITE_NAME: 'MESProductionDashboard'
-      DEPLOY_ROOT: 'D:\Senao\MESProductionDashboard'
-      CI_ROOT: 'D:\Senao\CI\MESProductionDashboard'
-      PUBLISH_DIR: 'D:\Senao\CI\MESProductionDashboard\publish'
-      RELEASES_DIR: 'D:\Senao\CI\MESProductionDashboard\releases'
-      BACKUP_ROOT: 'D:\Senao\CI\MESProductionDashboard\backup'
-      KEEP_RELEASES: '5'
+      SITE_NAME: 'MESProductionDashboardClient'
+      DEPLOY_ROOT: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient'
+      RELEASE_DIR: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\release'
+      BACKUP_ROOT: 'D:\Senao\MESProductionDashboard\MESProductionDashboardClient\backup'
+      CI_ROOT: 'D:\Senao\CI\MESProductionDashboardClient'
+      PUBLISH_DIR: 'D:\Senao\CI\MESProductionDashboardClient\publish'
       KEEP_BACKUPS: '10'
+      GITEA_BASE_URL: 'https://10.1.200.200:83'
 
     steps:
       - name: Checkout
@@ -111,10 +111,14 @@ jobs:
           Write-Host "npm ci completed successfully."
 
       - name: Build Vite application
+        env:
+          VITE_API_BASE_URL: 'http://10.1.200.200:84/api'
+          VITE_DEFAULT_FACTORY: 'VN'
+          VITE_LOG_LEVEL: 'error'
         run: |
           $ErrorActionPreference = 'Stop'
 
-          Write-Host "Starting Vite build..."
+          Write-Host "Starting Vite build with API: $env:VITE_API_BASE_URL"
           npm run build
 
           if ($LASTEXITCODE -ne 0) {
@@ -142,36 +146,36 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $dist = Join-Path $PWD "dist"
+          $dist    = Join-Path $PWD "dist"
           $publish = $env:PUBLISH_DIR
 
-          New-Item -ItemType Directory -Force $env:CI_ROOT |
-            Out-Null
+          New-Item -ItemType Directory -Force $env:CI_ROOT | Out-Null
 
-          # Xóa riêng thư mục publish, không xóa cache runner.
           if (Test-Path $publish) {
             Remove-Item $publish -Recurse -Force
           }
 
-          New-Item -ItemType Directory -Force $publish |
-            Out-Null
+          New-Item -ItemType Directory -Force $publish | Out-Null
 
-          Copy-Item (Join-Path $dist "*") `
-            -Destination $publish `
-            -Recurse -Force
+          Copy-Item (Join-Path $dist "*") -Destination $publish -Recurse -Force
 
-          $sha = (git rev-parse HEAD).Trim()
-          $short = (git rev-parse --short HEAD).Trim()
-          $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+          $sha         = (git rev-parse HEAD).Trim()
+          $short       = (git rev-parse --short HEAD).Trim()
+          $stamp       = Get-Date -Format "yyyyMMdd_HHmmss"
+          $pkgVersion  = "1.0.0"
+          if (Test-Path "package.json") {
+            $pkg = Get-Content "package.json" -Raw | ConvertFrom-Json
+            if ($pkg.version) { $pkgVersion = $pkg.version }
+          }
+          $tag         = "v${pkgVersion}_${short}"
           $releaseName = "${stamp}_${short}"
 
           @(
             "commit=$sha"
             "built=$stamp"
+            "version=$tag"
             "release=$releaseName"
-          ) | Set-Content `
-            -Path (Join-Path $publish "version.txt") `
-            -Encoding UTF8
+          ) | Set-Content -Path (Join-Path $publish "version.txt") -Encoding UTF8
 
           Set-Content `
             -Path (Join-Path $env:CI_ROOT "ci_release_name.txt") `
@@ -190,7 +194,7 @@ jobs:
             throw "Publish artifact missing version.txt."
           }
 
-          Write-Host "Publish artifact validated."
+          Write-Host "Publish artifact validated. Version: $tag"
 
       - name: Deploy to IIS with automatic rollback
         run: |
@@ -198,11 +202,11 @@ jobs:
 
           Import-Module WebAdministration -ErrorAction Stop
 
-          $siteName = $env:SITE_NAME
-          $publish = $env:PUBLISH_DIR
-          $releaseRoot = $env:RELEASES_DIR
-          $backupRoot = $env:BACKUP_ROOT
-          $ciRoot = $env:CI_ROOT
+          $siteName    = $env:SITE_NAME
+          $publish     = $env:PUBLISH_DIR
+          $releaseDir  = $env:RELEASE_DIR
+          $backupRoot  = $env:BACKUP_ROOT
+          $ciRoot      = $env:CI_ROOT
 
           $site = Get-Website -Name $siteName -ErrorAction Stop
           if (!$site) {
@@ -216,63 +220,47 @@ jobs:
 
           $null = Get-Item "IIS:\AppPools\$appPool" -ErrorAction Stop
 
-          $previousPath = [Environment]::ExpandEnvironmentVariables(
-            [string]$site.physicalPath
-          )
-
-          if (!(Test-Path $previousPath -PathType Container)) {
-            throw "Current IIS physical path does not exist: $previousPath"
-          }
+          $currentPath = [Environment]::ExpandEnvironmentVariables([string]$site.physicalPath)
 
           if (!(Test-Path (Join-Path $publish "index.html"))) {
-            throw "Publish artifact is missing."
+            throw "Publish artifact is missing index.html."
           }
 
-          New-Item -ItemType Directory -Force $releaseRoot |
-            Out-Null
-          New-Item -ItemType Directory -Force $backupRoot |
-            Out-Null
+          New-Item -ItemType Directory -Force $releaseDir | Out-Null
+          New-Item -ItemType Directory -Force $backupRoot | Out-Null
 
           $releaseName = (
-              Get-Content -LiteralPath (Join-Path $ciRoot "ci_release_name.txt") -Raw
+            Get-Content -LiteralPath (Join-Path $ciRoot "ci_release_name.txt") -Raw
           ).Trim()
 
-          if ($releaseName -notmatch '^\d{8}_\d{6}_[0-9a-fA-F]+$') {
-            throw "Invalid release name: $releaseName"
-          }
-
-          $releasePath = Join-Path $releaseRoot $releaseName
-
-          if (Test-Path $releasePath) {
-            throw "Release already exists: $releasePath"
-          }
-
           $backupStamp = Get-Date -Format "yyyyMMdd_HHmmss"
-          $backupPath = Join-Path $backupRoot $backupStamp
+          $backupPath  = Join-Path $backupRoot "${backupStamp}_${releaseName}"
 
-          $iisTouched = $false
+          $hasPreviousFiles = $false
+          $iisTouched       = $false
           $deploymentSucceeded = $false
 
           function Get-SmokeTarget {
             param([string]$Name)
 
             $bindings = @(Get-WebBinding -Name $Name)
-
             if ($bindings.Count -eq 0) {
               throw "No IIS bindings found for $Name."
             }
 
-            $binding = $bindings |
-              Sort-Object @{
-                Expression = {
-                  if ($_.protocol -eq 'http') { 0 } else { 1 }
-                }
-              } |
+            $preferred = $bindings |
+              Where-Object { $_.bindingInformation -match '^[^:]*:[0-9]+:$' } |
+              Sort-Object { if ($_.protocol -eq 'http') { 0 } else { 1 } } |
               Select-Object -First 1
+            if (-not $preferred) {
+              $preferred = $bindings |
+                Sort-Object { if ($_.protocol -eq 'http') { 0 } else { 1 } } |
+                Select-Object -First 1
+            }
 
-            $parts = $binding.bindingInformation.Split(':')
-            $ip = $parts[0]
-            $port = $parts[1]
+            $parts      = $preferred.bindingInformation.Split(':')
+            $ip         = $parts[0]
+            $port       = $parts[1]
             $hostHeader = $parts[2]
 
             $connectHost = $ip
@@ -287,41 +275,27 @@ jobs:
             }
 
             return @{
-              Url = "$($binding.protocol)://${connectHost}:$port/"
-              IsHttps = ($binding.protocol -eq 'https')
+              Url     = "$($preferred.protocol)://${connectHost}:$port/"
+              IsHttps = ($preferred.protocol -eq 'https')
             }
           }
 
           function Test-SiteHttp {
-            param(
-              [string]$Url,
-              [bool]$IsHttps
-            )
+            param([string]$Url, [bool]$IsHttps)
 
             for ($i = 1; $i -le 12; $i++) {
               try {
-                $curlArgs = @(
-                  '-sS',
-                  '-o', 'NUL',
-                  '-w', '%{http_code}',
-                  '--max-time', '15'
-                )
-
-                if ($IsHttps) {
-                  $curlArgs += '-k'
-                }
-
+                $curlArgs = @('-sS', '-o', 'NUL', '-w', '%{http_code}', '--max-time', '15')
+                if ($IsHttps) { $curlArgs += '-k' }
                 $curlArgs += $Url
 
                 $response = & curl.exe @curlArgs
                 $curlExit = $LASTEXITCODE
-                $code = ([string]$response).Trim()
+                $code     = ([string]$response).Trim()
 
                 Write-Host "Smoke test attempt ${i}: HTTP $code"
 
-                if ($curlExit -eq 0 -and $code -eq '200') {
-                  return $true
-                }
+                if ($curlExit -eq 0 -and $code -eq '200') { return $true }
               }
               catch {
                 Write-Host "Smoke test attempt ${i} failed: $($_.Exception.Message)"
@@ -333,189 +307,181 @@ jobs:
             return $false
           }
 
-          function Start-PreviousRelease {
+          function Restore-Backup {
             param(
-              [string]$OldPath,
-              [string]$Pool
+              [string]$SourceBackup,
+              [string]$TargetDir,
+              [string]$Pool,
+              [string]$Site
             )
 
-            Write-Host "Restoring IIS physical path: $OldPath"
+            Write-Host "Restoring backup from $SourceBackup to $TargetDir..."
 
-            Stop-Website -Name $siteName -ErrorAction SilentlyContinue
+            Stop-Website    -Name $Site -ErrorAction SilentlyContinue
             Stop-WebAppPool -Name $Pool -ErrorAction SilentlyContinue
 
-            Set-ItemProperty "IIS:\Sites\$siteName" `
-              -Name physicalPath -Value $OldPath
+            for ($w = 1; $w -le 15; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $Pool).Value -eq 'Stopped') { break }
+            }
+
+            if (Test-Path $SourceBackup) {
+              Get-ChildItem -LiteralPath $TargetDir -Force | Remove-Item -Recurse -Force
+              Copy-Item (Join-Path $SourceBackup "*") -Destination $TargetDir -Recurse -Force
+            }
+
+            Set-ItemProperty "IIS:\Sites\$Site" -Name physicalPath -Value $TargetDir
 
             Start-WebAppPool -Name $Pool
-            Start-Sleep -Seconds 3
-            Start-Website -Name $siteName
-
-            $state = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $Pool).Value
-
-            if ($state -ne 'Started' -or $poolState -ne 'Started') {
-              throw "Previous release restored, but IIS failed to start."
+            $poolStarted = $false
+            for ($w = 1; $w -le 10; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $Pool).Value -eq 'Started') {
+                $poolStarted = $true; break
+              }
+            }
+            if (-not $poolStarted) {
+              throw "Backup restored, but application pool failed to start."
             }
 
-            $target = Get-SmokeTarget -Name $siteName
+            Start-Website -Name $Site
+            if ((Get-Website -Name $Site).State -ne 'Started') {
+              throw "Backup restored, but IIS website failed to start."
+            }
+
+            $target = Get-SmokeTarget -Name $Site
             if (!(Test-SiteHttp -Url $target.Url -IsHttps $target.IsHttps)) {
-              throw "Previous release did not pass the HTTP smoke test."
+              throw "Restored backup did not pass the HTTP smoke test."
             }
 
-            Write-Host "Rollback completed and previous release responds with HTTP 200."
+            Write-Host "Rollback completed successfully. Site responds with HTTP 200."
           }
 
           try {
-            # 1. Stage the new release before stopping the live site.
-            New-Item -ItemType Directory -Force $releasePath |
-              Out-Null
-
-            Copy-Item (Join-Path $publish "*") `
-              -Destination $releasePath `
-              -Recurse -Force
-
-            # Grant IIS application pool read/execute permissions.
-            $aclUser = "IIS AppPool\$appPool"
-
-            & icacls.exe $releasePath `
-              /grant "${aclUser}:(OI)(CI)RX" /T /C
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Failed to grant IIS read permissions on release."
-            }
-
-            if (!(Test-Path (Join-Path $releasePath "index.html"))) {
-              throw "Staged release is missing index.html."
-            }
-
-            if (!(Test-Path (Join-Path $releasePath "version.txt"))) {
-              throw "Staged release is missing version.txt."
-            }
-
-            # 2. Back up current website files.
-            New-Item -ItemType Directory -Force $backupPath |
-              Out-Null
-
-            Get-ChildItem -LiteralPath $previousPath -Force |
-              Where-Object { $_.Name -ne 'app_offline.htm' } |
-              ForEach-Object {
-                Copy-Item -LiteralPath $_.FullName `
-                  -Destination $backupPath `
-                  -Recurse -Force
+            # 1. Back up current release files if present
+            $existingItems = @(Get-ChildItem -LiteralPath $releaseDir -Force)
+            if ($existingItems.Count -gt 0) {
+              $hasPreviousFiles = $true
+              New-Item -ItemType Directory -Force $backupPath | Out-Null
+              foreach ($item in $existingItems) {
+                Copy-Item -LiteralPath $item.FullName -Destination $backupPath -Recurse -Force
               }
 
-            $rollbackInfo = [ordered]@{
-              site = $siteName
-              applicationPool = $appPool
-              previousPhysicalPath = $previousPath
-              newPhysicalPath = $releasePath
-              commit = (git rev-parse HEAD).Trim()
-              created = (Get-Date).ToString('o')
+              $rollbackInfo = [ordered]@{
+                site                 = $siteName
+                applicationPool      = $appPool
+                previousPhysicalPath = $currentPath
+                targetPhysicalPath   = $releaseDir
+                backupPath           = $backupPath
+                commit               = (git rev-parse HEAD).Trim()
+                created              = (Get-Date).ToString('o')
+              }
+              $rollbackInfo |
+                ConvertTo-Json -Depth 5 |
+                Set-Content (Join-Path $backupPath "rollback.json") -Encoding UTF8
+
+              Write-Host "Current release backed up to: $backupPath"
+            } else {
+              Write-Host "No existing files in $releaseDir to back up."
             }
 
-            $rollbackInfo |
-              ConvertTo-Json -Depth 5 |
-              Set-Content (Join-Path $backupPath "rollback.json") `
-                -Encoding UTF8
-
-            Write-Host "Backup created: $backupPath"
-
-            # 3. Switch IIS. Failures from this point trigger rollback.
+            # 2. Stop site & pool before updating files in release directory
             $iisTouched = $true
 
-            Stop-Website -Name $siteName
-            Stop-WebAppPool -Name $appPool
+            Stop-Website    -Name $siteName -ErrorAction SilentlyContinue
+            Stop-WebAppPool -Name $appPool -ErrorAction SilentlyContinue
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne 'Stopped') {
-              throw "Application pool did not stop."
+            for ($w = 1; $w -le 15; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $appPool).Value -eq 'Stopped') { break }
             }
 
-            Set-ItemProperty "IIS:\Sites\$siteName" `
-              -Name physicalPath -Value $releasePath
+            # 3. Clean and deploy new files to release directory
+            Get-ChildItem -LiteralPath $releaseDir -Force | Remove-Item -Recurse -Force
+            Copy-Item (Join-Path $publish "*") -Destination $releaseDir -Recurse -Force
 
+            # 4. Grant IIS AppPool permissions
+            $aclUser = "IIS AppPool\$appPool"
+            & icacls.exe $releaseDir /grant "${aclUser}:(OI)(CI)RX" /T /C
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to grant IIS read permissions on release directory."
+            }
+
+            if (!(Test-Path (Join-Path $releaseDir "index.html"))) {
+              throw "Release directory is missing index.html after copy."
+            }
+
+            if (!(Test-Path (Join-Path $releaseDir "version.txt"))) {
+              throw "Release directory is missing version.txt after copy."
+            }
+
+            # 5. Ensure IIS physical path points to release directory
+            $configuredPath = [Environment]::ExpandEnvironmentVariables([string](Get-Website -Name $siteName).physicalPath)
+            if ($configuredPath.TrimEnd('\') -ne $releaseDir.TrimEnd('\')) {
+              Write-Host "Updating IIS physicalPath from '$configuredPath' to '$releaseDir'..."
+              Set-ItemProperty "IIS:\Sites\$siteName" -Name physicalPath -Value $releaseDir
+            }
+
+            # 6. Start Application Pool & Website
             Start-WebAppPool -Name $appPool
-            Start-Sleep -Seconds 3
-
-            if ((Get-WebAppPoolState -Name $appPool).Value -ne 'Started') {
-              throw "New release application pool failed to start."
+            $poolStarted = $false
+            for ($w = 1; $w -le 10; $w++) {
+              Start-Sleep -Seconds 2
+              if ((Get-WebAppPoolState -Name $appPool).Value -eq 'Started') {
+                $poolStarted = $true; break
+              }
+            }
+            if (-not $poolStarted) {
+              throw "Application pool failed to start."
             }
 
             Start-Website -Name $siteName
-
             if ((Get-Website -Name $siteName).State -ne 'Started') {
               throw "IIS site failed to start."
             }
 
-            # 4. Smoke test the deployed site.
+            # 7. Smoke test HTTP 200
             $target = Get-SmokeTarget -Name $siteName
-            Write-Host "Testing $($target.Url)"
+            Write-Host "Smoke testing $($target.Url)..."
 
             if (!(Test-SiteHttp -Url $target.Url -IsHttps $target.IsHttps)) {
-              throw "New release did not return HTTP 200."
-            }
-
-            # Verify that IIS points to the expected release.
-            $activePath = [Environment]::ExpandEnvironmentVariables(
-              [string](Get-Website -Name $siteName).physicalPath
-            )
-
-            if ($activePath.TrimEnd('\') -ne $releasePath.TrimEnd('\')) {
-              throw "IIS physical path does not match the new release."
+              throw "New release did not return HTTP 200 during smoke test."
             }
 
             $deploymentSucceeded = $true
-            Write-Host "Deployment successful: $releasePath"
+            Write-Host "Deployment successful to: $releaseDir"
           }
           catch {
             $deployError = $_.Exception.Message
-            Write-Host "Deployment failed: $deployError"
+            Write-Host "Deployment error: $deployError"
 
-            if ($iisTouched) {
+            if ($iisTouched -and $hasPreviousFiles) {
               try {
-                Start-PreviousRelease -OldPath $previousPath -Pool $appPool
+                Restore-Backup -SourceBackup $backupPath -TargetDir $releaseDir -Pool $appPool -Site $siteName
               }
               catch {
                 throw "DEPLOYMENT FAILED: $deployError. ROLLBACK ALSO FAILED: $($_.Exception.Message). Manual IIS recovery is required."
               }
             }
 
-            throw "Deployment failed. $(if ($iisTouched) { 'Rollback completed.' } else { 'The live IIS site was not changed.' }) Reason: $deployError"
+            throw "Deployment failed. $(if ($iisTouched -and $hasPreviousFiles) { 'Rollback completed.' } else { 'Live site untouched or no previous files existed.' }) Reason: $deployError"
           }
           finally {
             if (!$deploymentSucceeded) {
-              Write-Host "Deployment unsuccessful; preserving files for investigation."
+              Write-Host "Deployment did not succeed; check logs and artifacts."
             }
           }
 
-          # 5. Prune old releases/backups only after successful deployment.
-          $activePath = [string](Get-Website -Name $siteName).physicalPath
-          $keepReleases = [int]$env:KEEP_RELEASES
+          # 8. Prune old backups (keep latest N)
           $keepBackups = [int]$env:KEEP_BACKUPS
 
-          $releases = @(
-            Get-ChildItem -LiteralPath $releaseRoot -Directory |
-              Sort-Object Name -Descending
-          )
-
-          foreach ($old in ($releases | Select-Object -Skip $keepReleases)) {
-            if ($old.FullName.TrimEnd('\') -ne $activePath.TrimEnd('\')) {
-              Remove-Item -LiteralPath $old.FullName `
-                -Recurse -Force
-              Write-Host "Removed old release: $($old.Name)"
-            }
-          }
-
           $backups = @(
-            Get-ChildItem -LiteralPath $backupRoot -Directory |
-              Sort-Object Name -Descending
+            Get-ChildItem -LiteralPath $backupRoot -Directory | Sort-Object Name -Descending
           )
 
           foreach ($old in ($backups | Select-Object -Skip $keepBackups)) {
-            Remove-Item -LiteralPath $old.FullName `
-              -Recurse -Force
+            Remove-Item -LiteralPath $old.FullName -Recurse -Force
             Write-Host "Removed old backup: $($old.Name)"
           }
 
-          Write-Host "Deployment completed successfully."
+          Write-Host "Deployment process completed successfully."

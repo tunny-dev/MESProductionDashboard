@@ -11,10 +11,8 @@ import { cn } from '@/core/utils/utils';
 import { SkipToMain } from '@/components/common/SkipToMain';
 import { TopNav } from '@/components/layout/TopNav';
 import { Search } from '@/components/common/Search';
-// ThemeSwitcher là nút đổi theme DUY NHẤT của app — dùng chung với
-// trang chủ / đăng nhập / trang lỗi nên nút, menu và nhãn giống hệt nhau.
-// (Bản cũ components/theme-switch.jsx đã bỏ.)
-import { ThemeSwitcher } from '@/components/common/Preferences';
+
+import { LanguageSwitcher, ThemeSwitcher } from '@/components/common/preferences';
 import { ConfigDrawer } from '@/components/common/ConfigDrawer';
 import { AccountMenu } from '@/components/layout/AccountMenu';
 
@@ -32,22 +30,14 @@ const topNav = [
     disabled: false,
   },
   {
-    title: 'WIP Report',
-    href: '/wip-report',
-    isActive: false,
-    disabled: false,
-  },
-  {
-    title: 'Chart',
-    href: '/overview/chart',
+    title: 'Production Board',
+    href: '/production-board',
     isActive: false,
     disabled: false,
   },
 ];
 
-export function AppShell({ children }) {
-  // Mặc định app: sidebar COMPACT (gập thành icon) + LTR.
-  // `sidebar_state` chỉ ghi lại khi người dùng TỰ bấm — không có cookie là compact.
+export function AppLayout({ children }) {
   const defaultOpen = getCookie('sidebar_state') === 'true';
 
   return (
@@ -66,8 +56,9 @@ export function AppShell({ children }) {
             >
               <Header fixed={true}>
                 <TopNav links={topNav} />
-                <div className="ms-auto flex items-center space-x-2 sm:space-x-4">
+                <div className="ms-auto flex items-center space-x-2 sm:space-x-3">
                   <Search />
+                  <LanguageSwitcher />
                   <ThemeSwitcher />
                   <ConfigDrawer />
                   <AccountMenu />
@@ -82,5 +73,5 @@ export function AppShell({ children }) {
   );
 }
 
-export const AppLayout = AppShell;
+export const AppShell = AppLayout;
 export default AppLayout;

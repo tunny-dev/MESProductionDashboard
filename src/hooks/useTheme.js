@@ -23,7 +23,13 @@ function subscribeToSystemTheme(onChange) {
 
 const listeners = new Set();
 function notifyListeners() {
-  listeners.forEach((listener) => listener());
+  listeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // ignore
+    }
+  });
 }
 
 export function getStoredTheme() {
@@ -43,6 +49,26 @@ export function applyTheme(theme) {
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', resolved === 'dark' ? '#0b0f14' : '#eceff2');
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (!event.key || event.key === 'sfcs-theme' || event.key === 'theme') {
+      applyTheme(getStoredTheme());
+      notifyListeners();
+    }
+  });
+
+  const syncTheme = () => {
+    applyTheme(getStoredTheme());
+    notifyListeners();
+  };
+  window.addEventListener('focus', syncTheme);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      syncTheme();
+    }
+  });
 }
 
 function subscribeToTheme(callback) {

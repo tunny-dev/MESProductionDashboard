@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Copy } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { LanguageSwitcher, ThemeSwitcher } from '@/components/common/Preferences';
+import { LanguageSwitcher, ThemeSwitcher } from '@/components/common/preferences';
 import { cn } from '@/core/utils/utils';
 
 export function ErrorScreen({ code, title, message, actions, detail, role, className }) {
@@ -62,6 +62,7 @@ export function ErrorGhostButton({ children, onClick, to }) {
     <Button
       variant="outline"
       size="lg"
+      nativeButton={false}
       render={<Link to={to} onClick={onClick} />}
       className={ACTION_BUTTON}
     >
@@ -80,7 +81,12 @@ export function ErrorPrimaryButton({ children, to, onClick }) {
   }
 
   return (
-    <Button size="lg" render={<Link to={to} onClick={onClick} />} className={ACTION_BUTTON}>
+    <Button
+      size="lg"
+      nativeButton={false}
+      render={<Link to={to} onClick={onClick} />}
+      className={ACTION_BUTTON}
+    >
       {children}
     </Button>
   );

@@ -7,6 +7,7 @@ import { I18nextProvider } from 'react-i18next';
 import { i18n } from '@/core/i18n/i18n';
 import { queryClient } from '@/core/api/queryClient';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { OfflineBanner } from '@/components/common/OfflineBanner';
 import { Toaster } from '@/components/ui/toast';
 import { SessionExpiredDialog } from '@/components/common/SessionExpiredDialog';
 import { router } from '@/core/router/AppRouter';
@@ -17,10 +18,21 @@ export function App() {
     if (APP_CONFIG.title) {
       document.title = APP_CONFIG.title;
     }
+
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+        e.preventDefault();
+        router.navigate('/system-logs?tab=client');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (
     <ErrorBoundary>
+      <OfflineBanner />
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <RouterProvider router={router} />

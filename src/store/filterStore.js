@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { persist } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 
 /** Date → 'yyyy-MM-dd' theo GIỜ ĐỊA PHƯƠNG, không qua toISOString.
  *  `toISOString()` đổi sang UTC nên 00:00 ở VN thành hôm trước — lọc sai một ngày. */
@@ -26,36 +26,43 @@ const INITIAL_FILTERS = {
 };
 
 export const useFilterStore = create()(
-  persist(
-    (set) => ({
-      ...INITIAL_FILTERS,
+  devtools(
+    persist(
+      (set) => ({
+        ...INITIAL_FILTERS,
 
-      setArea: (areaId) => set({ areaId }),
-      setQuery: (query) => set({ query }),
-      setStatus: (status) => set({ status }),
+        setArea: (areaId) => set({ areaId }, false, 'filters/setArea'),
+        setQuery: (query) => set({ query }, false, 'filters/setQuery'),
+        setStatus: (status) => set({ status }, false, 'filters/setStatus'),
 
-      /** Khoảng ngày: nhận cả hai đầu, thiếu đầu nào thì bỏ lọc đầu đó. */
-      setDateRange: ({ from, to }) =>
-        set({
-          dateFrom: from ? toIsoDate(from) : null,
-          dateTo: to ? toIsoDate(to) : null,
-        }),
+        /** Khoảng ngày: nhận cả hai đầu, thiếu đầu nào thì bỏ lọc đầu đó. */
+        setDateRange: ({ from, to }) =>
+          set(
+            {
+              dateFrom: from ? toIsoDate(from) : null,
+              dateTo: to ? toIsoDate(to) : null,
+            },
+            false,
+            'filters/setDateRange'
+          ),
 
-      /** Gộp nhiều thay đổi vào một lần gọi, tránh render hai lần. */
-      applyFilters: (patch) => set(patch),
+        /** Gộp nhiều thay đổi vào một lần gọi, tránh render hai lần. */
+        applyFilters: (patch) => set(patch, false, 'filters/applyFilters'),
 
-      resetFilters: () => set(INITIAL_FILTERS),
-    }),
-    {
-      name: 'sfcs-filters',
-      partialize: (state) => ({
-        areaId: state.areaId,
-        query: state.query,
-        status: state.status,
-        dateFrom: state.dateFrom,
-        dateTo: state.dateTo,
+        resetFilters: () => set(INITIAL_FILTERS, false, 'filters/resetFilters'),
       }),
-    }
+      {
+        name: 'sfcs-filters',
+        partialize: (state) => ({
+          areaId: state.areaId,
+          query: state.query,
+          status: state.status,
+          dateFrom: state.dateFrom,
+          dateTo: state.dateTo,
+        }),
+      }
+    ),
+    { name: 'FilterStore', enabled: import.meta.env.DEV }
   )
 );
 

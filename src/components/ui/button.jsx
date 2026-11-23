@@ -39,13 +39,27 @@ const buttonVariants = cva(
   }
 );
 
-function Button({ className, variant = 'default', size = 'default', ...props }) {
+function Button({
+  className,
+  variant = 'default',
+  size = 'default',
+  asChild,
+  render,
+  children,
+  ...props
+}) {
+  const resolvedRender = asChild && !render && children ? children : render;
+  const resolvedChildren = asChild && !render ? undefined : children;
+
   return (
     <ButtonPrimitive
       data-slot="button"
+      render={resolvedRender}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {resolvedChildren}
+    </ButtonPrimitive>
   );
 }
 

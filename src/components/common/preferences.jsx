@@ -1,16 +1,16 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Globe, Laptop, Moon, Settings2, Sun, X } from 'lucide-react';
 
 import { cn } from '@/core/utils/utils';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -151,6 +151,7 @@ function PreferenceChoiceGroup({ name, value, options, onChange }) {
 
 export function DisplaySettingsDialog({ language, theme, onThemeChange, contentStyle, className }) {
   const { t, i18n } = useTranslation();
+  const [open, setOpen] = useState(false);
   const activeLanguage = String(language || i18n.resolvedLanguage || i18n.language || 'vi').split(
     '-'
   )[0];
@@ -166,67 +167,70 @@ export function DisplaySettingsDialog({ language, theme, onThemeChange, contentS
   }));
 
   return (
-    <Dialog>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={t('settings.open')}
-            title={t('settings.open')}
-            className={cn(
-              'size-7 justify-center border-border-strong bg-[var(--surface)] px-2 text-foreground hover:bg-[var(--surface-hover)] hover:text-foreground',
-              className
-            )}
-          />
-        }
-      >
-        <Settings2 data-icon="inline-start" aria-hidden="true" />
-      </DialogTrigger>
-      <DialogContent
-        showCloseButton={false}
-        style={contentStyle}
-        className="border border-border-strong bg-[var(--surface)] text-foreground shadow-modal sm:max-w-md"
-      >
-        <DialogHeader className="pr-8">
-          <DialogTitle>{t('settings.title')}</DialogTitle>
-          <DialogDescription>{t('settings.description')}</DialogDescription>
-        </DialogHeader>
-        <DialogClose
+    <>
+      <Tooltip>
+        <TooltipTrigger
           render={
             <Button
               type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('settings.close')}
-              className="absolute top-2 right-2"
-            />
+              variant="outline"
+              size="icon"
+              onClick={() => setOpen(true)}
+              aria-label={t('settings.tooltip', 'Cài đặt & Ngôn ngữ')}
+              className={cn(
+                'size-7 justify-center border-border-strong bg-[var(--surface)] px-2 text-foreground hover:bg-[var(--surface-hover)] hover:text-foreground cursor-pointer',
+                className
+              )}
+            >
+              <Settings2 data-icon="inline-start" aria-hidden="true" />
+            </Button>
           }
+        />
+        <TooltipContent side="bottom" className="text-xs font-medium">
+          {t('settings.tooltip', 'Cài đặt & Ngôn ngữ')}
+        </TooltipContent>
+      </Tooltip>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          showCloseButton={false}
+          style={contentStyle}
+          className="border border-border-strong bg-[var(--surface)] text-foreground shadow-modal sm:max-w-md"
         >
-          <X aria-hidden="true" />
-        </DialogClose>
-        <div className="grid gap-5">
-          <fieldset className="grid min-w-0 gap-2">
-            <legend className="text-sm font-medium text-foreground">{t('theme.label')}</legend>
-            <PreferenceChoiceGroup
-              name="dashboard-theme"
-              value={theme}
-              options={themeOptions}
-              onChange={onThemeChange}
-            />
-          </fieldset>
-          <fieldset className="grid min-w-0 gap-2">
-            <legend className="text-sm font-medium text-foreground">{t('language.label')}</legend>
-            <PreferenceChoiceGroup
-              name="dashboard-language"
-              value={activeLanguage}
-              options={languageOptions}
-              onChange={changeLanguage}
-            />
-          </fieldset>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <DialogHeader className="pr-8">
+            <DialogTitle>{t('settings.title')}</DialogTitle>
+            <DialogDescription>{t('settings.description')}</DialogDescription>
+          </DialogHeader>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label={t('settings.close')}
+            className="absolute top-2 right-2 inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none select-none hover:bg-[var(--surface-hover)] hover:text-foreground cursor-pointer"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
+          <div className="grid gap-5">
+            <fieldset className="grid min-w-0 gap-2">
+              <legend className="text-sm font-medium text-foreground">{t('theme.label')}</legend>
+              <PreferenceChoiceGroup
+                name="dashboard-theme"
+                value={theme}
+                options={themeOptions}
+                onChange={onThemeChange}
+              />
+            </fieldset>
+            <fieldset className="grid min-w-0 gap-2">
+              <legend className="text-sm font-medium text-foreground">{t('language.label')}</legend>
+              <PreferenceChoiceGroup
+                name="dashboard-language"
+                value={activeLanguage}
+                options={languageOptions}
+                onChange={changeLanguage}
+              />
+            </fieldset>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

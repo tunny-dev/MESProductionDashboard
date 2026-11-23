@@ -6,8 +6,10 @@ export const ROUTES = {
   FORBIDDEN: '/403',
   LINE_DETAIL: '/overview/line/:lineId',
   lineDetail: (lineId) => `/overview/line/${encodeURIComponent(lineId)}`,
-  CHART: '/overview/chart',
   PRODUCTION_DASHBOARD: '/production-dashboard',
-  WIP_REPORT: '/wip-report',
-  MAINTAIN_CIM_CYCLE_TIME: '/maintain/cim-cycle-time',
+  PRODUCTION_BOARD: '/production-board',
+  SYSTEM_LOGS: '/system-logs',
+  SYSTEM_LOGS_SQL: '/system-logs/sql',
+  SYSTEM_LOGS_ERRORS: '/system-logs/errors',
+  SYSTEM_LOGS_HEALTH: '/system-logs/health',
 };
