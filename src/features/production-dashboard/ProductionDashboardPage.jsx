@@ -79,7 +79,14 @@ export function ProductionDashboardPage() {
         const m = parseInt(clean.substring(4, 6), 10) - 1;
         const d = parseInt(clean.substring(6, 8), 10);
         const dt = new Date(y, m, d);
-        if (!isNaN(dt.getTime())) return dt;
+        if (
+          Number.isFinite(dt.getTime()) &&
+          dt.getFullYear() === y &&
+          dt.getMonth() === m &&
+          dt.getDate() === d
+        ) {
+          return dt;
+        }
       }
     }
     return new Date();
@@ -142,7 +149,6 @@ export function ProductionDashboardPage() {
     { enabled: shouldFetchWoList }
   );
   const selectedWo = woValue ? (woList.find((w) => w.mo === woValue) ?? null) : null;
-  const model = selectedWo?.partNumber ?? 'ALL';
 
   const group = process ?? mfgInfo?.mfgType ?? null;
   const [applied, setApplied] = useState(() => {
@@ -158,6 +164,8 @@ export function ProductionDashboardPage() {
     }
     return null;
   });
+  const appliedWo = applied?.mo ? (woList.find((w) => w.mo === applied.mo) ?? null) : null;
+  const model = (applied ? appliedWo : selectedWo)?.partNumber ?? 'ALL';
   const canSearch = Boolean(lineId && shift && group && deptCode && woValue);
 
   // Lần đầu vào trang: nếu có URL mo nhưng chưa applied, nạp vào applied đúng 1 lần duy nhất lúc mount
@@ -218,7 +226,7 @@ export function ProductionDashboardPage() {
   const flowLoading = isLoading && !viewData;
 
   const { data: moInfo } = useMoInfo(applied?.mo ?? null, Boolean(applied));
-  const displayWo = moInfo ?? selectedWo;
+  const displayWo = moInfo ?? appliedWo ?? selectedWo;
 
   const lineLabel = useMemo(() => {
     if (!lineId) return '';
@@ -509,24 +517,6 @@ export function ProductionDashboardPage() {
   function handleWoChange(nextWo) {
     isInitialMountRef.current = false;
     setWoValue(nextWo);
-    if (lineId && shift && group && deptCode && nextWo) {
-      setApplied({
-        lineId,
-        group,
-        dept: deptCode,
-        mo: nextWo,
-        date: dateKey,
-        shift: shift.id,
-      });
-      setSearchParams(
-        (p) => {
-          const n = new URLSearchParams(p);
-          n.set('mo', nextWo);
-          return n;
-        },
-        { replace: true }
-      );
-    }
   }
 
   function handleShiftChange(nextShiftId) {
@@ -536,11 +526,13 @@ export function ProductionDashboardPage() {
       (p) => {
         const n = new URLSearchParams(p);
         n.set('shift', nextShiftId);
+        n.delete('mo');
+        n.delete('wo');
         return n;
       },
       { replace: true }
     );
-    // Khi đổi ca: xóa applied để không tự động query, chỉ khi bấm tìm kiếm hoặc chọn MO mới query
+    // Khi đổi ca: xóa applied để chờ người dùng xác nhận lại bằng nút tìm kiếm
     setApplied(null);
   }
 
@@ -559,7 +551,11 @@ export function ProductionDashboardPage() {
     setSearchParams(
       (p) => {
         const n = new URLSearchParams(p);
+        n.set('line', lineId);
         n.set('mo', woValue);
+        n.set('date', dateKey);
+        n.set('shift', shift.id);
+        n.delete('wo');
         return n;
       },
       { replace: true }
@@ -687,11 +683,15 @@ export function ProductionDashboardPage() {
                 summary={viewData?.summary}
                 copy={copy}
                 lineId={applied?.lineId || lineId}
-                lineLabel={applied?.lineId || lineId}
+                lineLabel={
+                  lines.find((line) => line.id === (applied?.lineId || lineId))?.name ??
+                  applied?.lineId ??
+                  lineId
+                }
                 date={applied?.date || dateKey}
                 shift={applied?.shift || shift}
                 mo={applied?.mo}
-                deptCode={applied?.deptCode}
+                deptCode={applied?.dept}
                 stations={modelStations}
                 columnSettings={columnSettings}
                 wipLimit={wipLimit}
