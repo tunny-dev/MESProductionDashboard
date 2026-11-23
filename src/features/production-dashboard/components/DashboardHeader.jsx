@@ -1,4 +1,7 @@
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { format } from 'date-fns';
 import { enUS, vi, zhCN } from 'react-day-picker/locale';
 import { CalendarDays, Loader2, Maximize2, Minimize2, RefreshCw, Search } from 'lucide-react';
@@ -25,6 +28,14 @@ import { Link } from 'react-router-dom';
 
 const calendarLocales = { vi, en: enUS, zh: zhCN };
 const weekdaysVi = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+const dashboardFilterSchema = z.object({
+  process: z.string().min(1, 'Select a process.'),
+  lineId: z.string().min(1, 'Select a production line.'),
+  workOrder: z.string().min(1, 'Select a work order.'),
+  shiftId: z.string().min(1, 'Select a shift.'),
+  selectedDate: z.date(),
+});
 
 function getProductionDateLabel(date, language) {
   const languageCode = String(language || 'vi').split('-')[0];
@@ -148,6 +159,35 @@ export const DashboardHeader = memo(function DashboardHeader({
     day: copy.dayShiftShort,
     night: copy.nightShiftShort,
   };
+  const filterForm = useForm({
+    resolver: zodResolver(dashboardFilterSchema),
+    defaultValues: {
+      process: process ?? '',
+      lineId: lineId ?? '',
+      workOrder: wo ?? '',
+      shiftId: shiftId ?? '',
+      selectedDate,
+    },
+  });
+  const resetFilters = filterForm.reset;
+
+  useEffect(() => {
+    resetFilters({
+      process: process ?? '',
+      lineId: lineId ?? '',
+      workOrder: wo ?? '',
+      shiftId: shiftId ?? '',
+      selectedDate,
+    });
+  }, [resetFilters, process, lineId, wo, shiftId, selectedDate]);
+
+  function updateFilter(name, value) {
+    filterForm.setValue(name, value, { shouldDirty: true, shouldValidate: false });
+  }
+
+  function handleFilterSubmit() {
+    onSearch?.();
+  }
 
   return (
     <header className="sticky top-0 z-40 grid shrink-0 grid-cols-1 items-center gap-x-3 gap-y-3 border-b border-border/80 bg-background pb-2 sm:grid-cols-[minmax(0,1fr)_max-content] xl:grid-cols-[minmax(0,max-content)_minmax(0,1fr)_minmax(0,max-content)] xl:gap-4 2xl:gap-6">
@@ -168,10 +208,10 @@ export const DashboardHeader = memo(function DashboardHeader({
         </div>
       </div>
 
-      <section
+      <form
         aria-label={copy.filters.line}
-        className="grid min-w-0 grid-cols-2 gap-2.5 sm:col-span-2 sm:col-start-1 sm:row-start-2 sm:grid-cols-3 xl:w-full xl:max-w-[1040px] xl:col-span-1 xl:col-start-2 xl:row-start-1 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto] xl:justify-self-start xl:gap-3 2xl:justify-self-center
-        "
+        onSubmit={filterForm.handleSubmit(handleFilterSubmit)}
+        className="grid min-w-0 grid-cols-2 gap-2.5 sm:col-span-2 sm:col-start-1 sm:row-start-2 sm:grid-cols-3 xl:w-full xl:max-w-[1040px] xl:col-span-1 xl:col-start-2 xl:row-start-1 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto] xl:justify-self-start xl:gap-3 2xl:justify-self-center"
       >
         <FilterSelect
           id="production-process-filter"
@@ -179,7 +219,10 @@ export const DashboardHeader = memo(function DashboardHeader({
           value={process}
           placeholder={copy.filters.selectProcess}
           themeStyle={themeStyle}
-          onValueChange={onProcessChange}
+          onValueChange={(value) => {
+            updateFilter('process', value);
+            onProcessChange?.(value);
+          }}
         >
           <SelectGroup>
             <SelectLabel className="text-production-blue">{copy.filters.process}</SelectLabel>
@@ -201,7 +244,10 @@ export const DashboardHeader = memo(function DashboardHeader({
           loading={linesLoading}
           loadingText={copy.loadingShort}
           themeStyle={themeStyle}
-          onValueChange={onLineChange}
+          onValueChange={(value) => {
+            updateFilter('lineId', value);
+            onLineChange?.(value);
+          }}
         >
           <SelectGroup>
             <SelectLabel className="text-production-blue">{copy.filters.line}</SelectLabel>
@@ -245,7 +291,11 @@ export const DashboardHeader = memo(function DashboardHeader({
               <Calendar
                 mode="single"
                 selected={selectedDate}
-                onSelect={onDateChange}
+                onSelect={(date) => {
+                  if (!date) return;
+                  updateFilter('selectedDate', date);
+                  onDateChange?.(date);
+                }}
                 locale={locale}
                 className="rounded-lg bg-transparent"
                 classNames={{
@@ -272,7 +322,10 @@ export const DashboardHeader = memo(function DashboardHeader({
             onOpenChange={setWoPickerOpen}
             woList={woList}
             value={wo ?? null}
-            onSelect={onWoChange}
+            onSelect={(value) => {
+              updateFilter('workOrder', value ?? '');
+              onWoChange?.(value);
+            }}
             copy={copy}
             themeStyle={themeStyle}
             loading={woLoading}
@@ -288,7 +341,10 @@ export const DashboardHeader = memo(function DashboardHeader({
           themeStyle={themeStyle}
           valueLabel={shiftId ? shiftTriggerLabels[shiftId] : undefined}
           valueTitle={shiftId ? shiftLabels[shiftId] : undefined}
-          onValueChange={onShiftChange}
+          onValueChange={(value) => {
+            updateFilter('shiftId', value);
+            onShiftChange?.(value);
+          }}
         >
           <SelectGroup>
             <SelectLabel className="text-production-blue">{copy.filters.shift}</SelectLabel>
@@ -308,11 +364,10 @@ export const DashboardHeader = memo(function DashboardHeader({
             &nbsp;
           </span>
           <Button
-            type="button"
+            type="submit"
             variant="default"
             size="icon-lg"
             disabled={!canSearch || isSearching}
-            onClick={onSearch}
             title={copy.filters.search}
             aria-label={copy.filters.search}
             className="shrink-0"
@@ -324,7 +379,7 @@ export const DashboardHeader = memo(function DashboardHeader({
             )}
           </Button>
         </div>
-      </section>
+      </form>
 
       <div className="flex min-w-0 items-center justify-between gap-3 sm:col-start-2 sm:row-start-1 xl:min-w-[270px] xl:col-start-3 xl:justify-end">
         <div className="min-w-0 flex-1 text-right">

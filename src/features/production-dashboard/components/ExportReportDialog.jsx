@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -46,6 +49,14 @@ import {
   generateCsvReport,
 } from '@/services/export.service';
 
+const exportFormSchema = z.object({
+  activeTemplate: z.enum(['HOURLY_PRODUCTION', 'STATION_FLOW', 'STATION_SERIALS', 'YIELD_DEFECT']),
+  customFileName: z.string(),
+  selectedStation: z.string(),
+  selectedCategory: z.enum(['FINISH', 'INPUT', 'WIP', 'NG', 'NOT_INPUT']),
+  fileFormat: z.enum(['xlsx', 'csv']),
+});
+
 function formatToYyyyMmDd(val) {
   if (!val) return '';
   if (val instanceof Date) {
@@ -76,11 +87,27 @@ export function ExportReportDialog({
 }) {
   const { t, i18n } = useTranslation();
 
-  const [activeTemplate, setActiveTemplate] = useState('HOURLY_PRODUCTION');
-  const [customFileName, setCustomFileName] = useState('');
-  const [selectedStation, setSelectedStation] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('FINISH');
-  const [fileFormat, setFileFormat] = useState('xlsx'); // 'xlsx' | 'csv'
+  const exportForm = useForm({
+    resolver: zodResolver(exportFormSchema),
+    defaultValues: {
+      activeTemplate: 'HOURLY_PRODUCTION',
+      customFileName: '',
+      selectedStation: '',
+      selectedCategory: 'FINISH',
+      fileFormat: 'xlsx',
+    },
+  });
+  const activeTemplate = useWatch({ control: exportForm.control, name: 'activeTemplate' });
+  const customFileName = useWatch({ control: exportForm.control, name: 'customFileName' });
+  const selectedStation = useWatch({ control: exportForm.control, name: 'selectedStation' });
+  const selectedCategory = useWatch({ control: exportForm.control, name: 'selectedCategory' });
+  const fileFormat = useWatch({ control: exportForm.control, name: 'fileFormat' });
+  const setExportValue = exportForm.setValue;
+  const setActiveTemplate = (value) => setExportValue('activeTemplate', value);
+  const setCustomFileName = (value) => setExportValue('customFileName', value);
+  const setSelectedStation = (value) => setExportValue('selectedStation', value);
+  const setSelectedCategory = (value) => setExportValue('selectedCategory', value);
+  const setFileFormat = (value) => setExportValue('fileFormat', value);
 
   // Trạng thái xem trước dữ liệu (on-demand: chỉ truy vấn khi bấm nút)
   const [showPreview, setShowPreview] = useState(false);
@@ -213,7 +240,10 @@ export function ExportReportDialog({
         prefix = t('exportDialog.fileNamePrefixYield', 'BaoCao_ChatLuong_FPY');
       }
 
-      setCustomFileName(`${prefix}_${linePart}_${moPart}_${cleanDateStr}_${shiftPart}`);
+      setExportValue(
+        'customFileName',
+        `${prefix}_${linePart}_${moPart}_${cleanDateStr}_${shiftPart}`
+      );
 
       // Reset trạng thái preview khi đổi template
       setPreviewData(null);
@@ -232,6 +262,7 @@ export function ExportReportDialog({
     selectedCategory,
     t,
     i18n.language,
+    setExportValue,
   ]);
 
   // Hàm truy vấn 5 dòng dữ liệu xem trước khi người dùng chủ động bấm
@@ -444,7 +475,11 @@ export function ExportReportDialog({
             },
           }}
         >
-          <div className="px-6 py-4 space-y-4">
+          <form
+            id="export-report-form"
+            onSubmit={exportForm.handleSubmit(() => handleDownload())}
+            className="px-6 py-4 space-y-4"
+          >
             {successMsg && (
               <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -610,6 +645,7 @@ export function ExportReportDialog({
                     <Input
                       value={customFileName}
                       disabled={isExporting}
+                      aria-invalid={Boolean(exportForm.formState.errors.customFileName)}
                       onChange={(e) => setCustomFileName(e.target.value)}
                       placeholder={t(
                         'exportDialog.fileNamePlaceholder',
@@ -700,7 +736,7 @@ export function ExportReportDialog({
                     variant="outline"
                     size="sm"
                     disabled={previewLoading || isExporting}
-                    onClick={handleFetchPreview}
+                    onClick={exportForm.handleSubmit(handleFetchPreview)}
                     className="h-8 gap-1.5 text-xs font-medium border-border/80 bg-background hover:bg-muted cursor-pointer"
                   >
                     {previewLoading ? (
@@ -810,7 +846,7 @@ export function ExportReportDialog({
                 </div>
               )}
             </div>
-          </div>
+          </form>
         </OverlayScroll>
 
         <div className="px-6 py-3.5 border-t border-border bg-muted/40 rounded-b-2xl flex items-center justify-between sm:justify-between shrink-0">
@@ -833,9 +869,9 @@ export function ExportReportDialog({
               {t('exportDialog.cancel', 'Hủy bỏ')}
             </Button>
             <Button
-              type="button"
+              type="submit"
+              form="export-report-form"
               size="sm"
-              onClick={() => handleDownload()}
               disabled={isExporting}
               className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer shadow-xs min-w-[140px] justify-center"
             >

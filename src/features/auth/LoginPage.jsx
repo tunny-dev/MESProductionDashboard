@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,7 +17,7 @@ import {
 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input.jsx';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field.jsx';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field.jsx';
 import { LanguageSwitcher, ThemeSwitcher } from '@/components/common/preferences';
 import { LoadingButton } from '@/components/common';
 import { toast } from '@/components/ui/toast';
@@ -27,12 +30,18 @@ export function LoginPage() {
   const sessionExpired = useSessionStore((s) => s.sessionExpired);
   const resetSessionExpiry = useSessionStore((s) => s.resetSessionExpiry);
 
-  const passwordRef = useRef(null);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const form = useForm({
+    resolver: zodResolver(
+      z.object({
+        username: z.string().trim().min(1, 'Username is required.'),
+        password: z.string().min(1, 'Password is required.'),
+      })
+    ),
+    defaultValues: { username: '', password: '' },
+  });
 
-  const { mutate: doLogin, isPending, errorMessage, reset } = useLogin();
+  const { mutate: doLogin, isPending, errorMessage, reset: resetLogin } = useLogin();
 
   useEffect(() => {
     if (sessionExpired) {
@@ -46,16 +55,15 @@ export function LoginPage() {
     }
   }, [sessionExpired, resetSessionExpiry]);
 
-  function handleSubmit(event) {
-    event.preventDefault();
+  function handleSubmit(values) {
     if (isPending) return;
-    reset();
+    resetLogin();
     doLogin(
-      { username: username.trim(), password },
+      { username: values.username.trim(), password: values.password },
       {
         onError: () => {
-          setPassword('');
-          passwordRef.current?.focus();
+          form.setValue('password', '');
+          document.getElementById('password')?.focus();
         },
       }
     );
@@ -301,9 +309,9 @@ export function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-7">
-            <FieldGroup className="space-y-4">
-              <Field>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-7">
+            <FieldGroup>
+              <Field data-invalid={Boolean(form.formState.errors.username)}>
                 <FieldLabel
                   htmlFor="username"
                   className="text-xs sm:text-sm font-medium text-foreground"
@@ -312,21 +320,17 @@ export function LoginPage() {
                 </FieldLabel>
                 <Input
                   id="username"
-                  name="username"
                   autoComplete="username"
                   autoFocus
-                  required
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value);
-                    reset();
-                  }}
+                  aria-invalid={Boolean(form.formState.errors.username)}
+                  {...form.register('username', { onChange: resetLogin })}
                   placeholder={t('auth.usernamePlaceholder')}
                   className="mt-1.5 h-11 sm:h-12 text-sm rounded-xl bg-surface/80 dark:bg-surface/50 border-border/90 focus-visible:ring-primary/30"
                 />
+                <FieldError errors={[form.formState.errors.username]} />
               </Field>
 
-              <Field>
+              <Field data-invalid={Boolean(form.formState.errors.password)}>
                 <div className="flex items-center justify-between">
                   <FieldLabel
                     htmlFor="password"
@@ -343,17 +347,12 @@ export function LoginPage() {
                 </div>
                 <div className="relative mt-1.5">
                   <Input
-                    ref={passwordRef}
                     id="password"
                     name="password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      reset();
-                    }}
+                    aria-invalid={Boolean(form.formState.errors.password)}
+                    {...form.register('password', { onChange: resetLogin })}
                     placeholder={t('auth.passwordPlaceholder')}
                     className="h-11 sm:h-12 pr-11 text-sm rounded-xl bg-surface/80 dark:bg-surface/50 border-border/90 focus-visible:ring-primary/30"
                   />
@@ -371,6 +370,7 @@ export function LoginPage() {
                     )}
                   </button>
                 </div>
+                <FieldError errors={[form.formState.errors.password]} />
               </Field>
             </FieldGroup>
 
